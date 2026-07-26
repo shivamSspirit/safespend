@@ -79,7 +79,8 @@ plugins/allowance-pay/       Onchain-capped payment WASM tool
 tools/devnet-setup/          Founder-authorized devnet provisioning CLI
 tools/devnet-exercise/       Native harness for the production payment engine
 tools/burn-calibrator/       Finalized-history burn-policy calibration CLI
-wit/v0/                      Pinned ZeroClaw plugin interface
+wit/v0/                      Unmodified pinned ZeroClaw plugin interfaces
+wit/safespend-tool-v0/       Minimal host-compatible tool export world
 zeroclaw/                    Skill, SOPs, and example runtime configuration
 docs/                        Architecture, setup, tests, threat model, demo
 evidence/devnet/             Public, sanitized onchain integration evidence

@@ -75,3 +75,29 @@ fn source_manifests_match_the_trusted_publisher() {
             .unwrap_or_else(|_| panic!("{relative} signature must verify"));
     }
 }
+
+#[test]
+fn tool_components_use_the_host_compatible_world() {
+    let root = project_root();
+    let shim = fs::read_to_string(root.join("wit/safespend-tool-v0/tool.wit"))
+        .expect("SafeSpend tool WIT");
+    assert!(
+        !shim.contains("import logging"),
+        "the pinned ZeroClaw tool linker cannot instantiate the logging import"
+    );
+
+    for relative in [
+        "plugins/treasury-watch/src/lib.rs",
+        "plugins/allowance-pay/src/lib.rs",
+    ] {
+        let source = fs::read_to_string(root.join(relative)).expect("plugin component source");
+        assert!(
+            source.contains("wit/safespend-tool-v0"),
+            "{relative} must use the host-compatible tool world"
+        );
+        assert!(
+            !source.contains("zeroclaw::plugin::logging"),
+            "{relative} must not reintroduce the unsupported host import"
+        );
+    }
+}

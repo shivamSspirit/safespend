@@ -6,7 +6,7 @@ pub const TOOL_NAME: &str = "safespend_allowance_pay";
 #[cfg(target_family = "wasm")]
 mod component {
     wit_bindgen::generate!({
-        path: "../../wit/v0",
+        path: "../../wit/safespend-tool-v0",
         world: "tool-plugin",
         features: ["plugins-wit-v0"],
     });
@@ -14,9 +14,6 @@ mod component {
     use exports::zeroclaw::plugin::plugin_info::Guest as PluginInfo;
     use exports::zeroclaw::plugin::tool::{Guest as Tool, ToolResult};
     use std::collections::HashMap;
-    use zeroclaw::plugin::logging::{
-        log_record, LogLevel, PluginAction, PluginEvent, PluginOutcome,
-    };
     use zeroize::{Zeroize, Zeroizing};
 
     use crate::pay::{execute_payment, PayConfig, PayError, RpcTransport};
@@ -112,49 +109,23 @@ mod component {
                 amount_base_units: parsed.amount_base_units,
             };
             match execute_payment(&WakiTransport, &config, &request) {
-                Ok(output) => {
-                    emit(
-                        PluginAction::Complete,
-                        PluginOutcome::Success,
-                        "bounded payment submitted",
-                    );
-                    Ok(ToolResult {
-                        success: true,
-                        output: serde_json::to_string(&output)
-                            .map_err(|_| "failed to serialize payment result".to_string())?,
-                        error: None,
-                    })
-                }
+                Ok(output) => Ok(ToolResult {
+                    success: true,
+                    output: serde_json::to_string(&output)
+                        .map_err(|_| "failed to serialize payment result".to_string())?,
+                    error: None,
+                }),
                 Err(error) => failure(error.to_string()),
             }
         }
     }
 
     fn failure(message: String) -> Result<ToolResult, String> {
-        emit(
-            PluginAction::Fail,
-            PluginOutcome::Failure,
-            "bounded payment rejected",
-        );
         Ok(ToolResult {
             success: false,
             output: String::new(),
             error: Some(message),
         })
-    }
-
-    fn emit(action: PluginAction, outcome: PluginOutcome, message: &str) {
-        log_record(
-            LogLevel::Info,
-            &PluginEvent {
-                function_name: "safespend_allowance_pay::tool::execute".to_string(),
-                action,
-                outcome: Some(outcome),
-                duration_ms: None,
-                attrs: None,
-                message: message.to_string(),
-            },
-        );
     }
 
     export!(AllowancePay);

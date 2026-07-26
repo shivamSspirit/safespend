@@ -41,4 +41,10 @@ signature over the explicitly approved WASM package, manifests, and complete
 tracked plugin-source inventory. The runtime loads that package rather than a
 platform-dependent build directory.
 
+Live testing against the pinned official host also found that its experimental
+tool linker did not satisfy the `logging` import declared by the vendored tool
+world. SafeSpend keeps the upstream WIT unchanged and builds its two tools
+against `wit/safespend-tool-v0/`, which preserves the same exported
+`plugin-info` and `tool` interfaces while omitting that unused import.
+
 These notes are a source-review record, not an audit of any upstream project.

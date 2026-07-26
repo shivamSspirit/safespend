@@ -6,7 +6,7 @@ pub const TOOL_NAME: &str = "safespend_treasury_watch";
 #[cfg(target_family = "wasm")]
 mod component {
     wit_bindgen::generate!({
-        path: "../../wit/v0",
+        path: "../../wit/safespend-tool-v0",
         world: "tool-plugin",
         features: ["plugins-wit-v0"],
     });
@@ -15,9 +15,6 @@ mod component {
 
     use exports::zeroclaw::plugin::plugin_info::Guest as PluginInfo;
     use exports::zeroclaw::plugin::tool::{Guest as Tool, ToolResult};
-    use zeroclaw::plugin::logging::{
-        log_record, LogLevel, PluginAction, PluginEvent, PluginOutcome,
-    };
 
     use crate::watch::{execute_watch, RpcTransport, WatchArgs, WatchConfig, WatchError};
 
@@ -88,11 +85,23 @@ mod component {
                     },
                     "native_cursor": {
                         "type": "object",
-                        "description": "Native SOL activity cursor returned by the previous call."
+                        "description": "Native SOL activity cursor returned by the previous call; use an empty object on first run.",
+                        "properties": {
+                            "last_finalized_signature": {"type": ["string", "null"]},
+                            "backfill_before": {"type": ["string", "null"]},
+                            "pending_newest_signature": {"type": ["string", "null"]}
+                        },
+                        "additionalProperties": false
                     },
                     "token_cursor": {
                         "type": "object",
-                        "description": "Treasury token-account cursor returned by the previous call."
+                        "description": "Treasury token-account cursor returned by the previous call; use an empty object on first run.",
+                        "properties": {
+                            "last_finalized_signature": {"type": ["string", "null"]},
+                            "backfill_before": {"type": ["string", "null"]},
+                            "pending_newest_signature": {"type": ["string", "null"]}
+                        },
+                        "additionalProperties": false
                     },
                     "observed_at_ts": {
                         "type": "integer",
@@ -121,49 +130,23 @@ mod component {
                 token_cursor: parsed.token_cursor,
             };
             match execute_watch(&WakiTransport, &config, &request, parsed.observed_at_ts) {
-                Ok(output) => {
-                    emit(
-                        PluginAction::Complete,
-                        PluginOutcome::Success,
-                        "treasury watch completed",
-                    );
-                    Ok(ToolResult {
-                        success: true,
-                        output: serde_json::to_string(&output)
-                            .map_err(|error| format!("serialize output: {error}"))?,
-                        error: None,
-                    })
-                }
+                Ok(output) => Ok(ToolResult {
+                    success: true,
+                    output: serde_json::to_string(&output)
+                        .map_err(|error| format!("serialize output: {error}"))?,
+                    error: None,
+                }),
                 Err(error) => failure(error.to_string()),
             }
         }
     }
 
     fn failure(message: String) -> Result<ToolResult, String> {
-        emit(
-            PluginAction::Fail,
-            PluginOutcome::Failure,
-            "treasury watch failed closed",
-        );
         Ok(ToolResult {
             success: false,
             output: String::new(),
             error: Some(message),
         })
-    }
-
-    fn emit(action: PluginAction, outcome: PluginOutcome, message: &str) {
-        log_record(
-            LogLevel::Info,
-            &PluginEvent {
-                function_name: "safespend_treasury_watch::tool::execute".to_string(),
-                action,
-                outcome: Some(outcome),
-                duration_ms: None,
-                attrs: None,
-                message: message.to_string(),
-            },
-        );
     }
 
     export!(TreasuryWatch);

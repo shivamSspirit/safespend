@@ -49,6 +49,7 @@ result, and transaction signature (when any) for every case.
 | Submitted but not finalized | agent says `submitted` |
 | Approved WASM, manifest, or tracked plugin input differs from signed digest | release verification fails |
 | Credential pattern appears anywhere in Git history | Gitleaks CI job fails |
+| Tool component imports unsupported host logging interface | source regression test fails |
 
 ## Automated coverage
 
