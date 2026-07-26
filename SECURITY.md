@@ -10,11 +10,12 @@ Supabase surface must satisfy
 
 ## Reporting
 
-Please disclose a suspected vulnerability privately to the repository
-maintainer. Do not include private keys, seed phrases, bot tokens, RPC
-credentials, or live transaction payloads in a report. Until a dedicated
-security contact is published, open a GitHub issue containing only a request
-for a private disclosure channel.
+Please use the repository's
+[private vulnerability report](https://github.com/shivamSspirit/safespend/security/advisories/new)
+to disclose a suspected vulnerability. Do not include private keys, seed
+phrases, bot tokens, RPC credentials, or live transaction payloads in a public
+issue. If GitHub's private form is unavailable, open an issue containing only a
+request for a private disclosure channel.
 
 ## Supported versions
 

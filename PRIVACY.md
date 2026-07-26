@@ -76,7 +76,8 @@ SafeSpend is business treasury software and is not directed to children.
 ## Changes and contact
 
 Material changes will be recorded in this repository. For a security issue,
-follow [SECURITY.md](SECURITY.md). For privacy questions about the open-source
-project, open a GitHub discussion or contact the maintainer privately through
-the security-reporting route. Do not place credentials, private keys, personal
-messages, or sensitive transaction context in a public issue.
+follow [SECURITY.md](SECURITY.md) and use the enabled private vulnerability
+reporting form. For privacy questions about the open-source project, open a
+GitHub discussion or contact the maintainer privately through that reporting
+route. Do not place credentials, private keys, personal messages, or sensitive
+transaction context in a public issue.
