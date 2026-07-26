@@ -47,6 +47,8 @@ result, and transaction signature (when any) for every case.
 | Delta below threshold | no noisy alert |
 | First watcher run | baseline only, no invented delta |
 | Submitted but not finalized | agent says `submitted` |
+| Read-only monitoring cron starts | T0 SOP advances without an approval gate |
+| Payment SOP starts | remains supervised and pauses for founder approval |
 | Approved WASM, manifest, or tracked plugin input differs from signed digest | release verification fails |
 | Credential pattern appears anywhere in Git history | Gitleaks CI job fails |
 | Tool component imports unsupported host logging interface | source regression test fails |

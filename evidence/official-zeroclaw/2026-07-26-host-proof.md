@@ -83,6 +83,26 @@ Current SafeSpend treasury status:
 - Alerts: none
 ```
 
+## Scheduled SOP execution
+
+A real one-shot agent cron was installed with a per-job allowlist containing
+only the watcher, compact-memory tools, and SOP lifecycle tools. On daemon
+startup, the scheduler caught up the job and:
+
+1. verified both publisher signatures and registered both WASM tools;
+2. started `treasury-monitor` version `0.1.1` in T0 `auto` mode;
+3. recalled only the three fixed SafeSpend memory keys;
+4. called the watcher successfully at finalized slot `479049479`;
+5. stored only the returned snapshot and two cursors;
+6. completed all four SOP steps; and
+7. emitted no notification because the run was baseline-only with no alert or
+   finalized activity.
+
+The completed SOP reported the same 88-token balance and 8.8-week runway. An
+earlier test caught that `execution_mode = "supervised"` paused the read-only
+cron at its initial approval gate. Only the T0 monitor was changed to `auto`;
+the payment SOP remains supervised and separately gated.
+
 This run exposed and closed an integration defect before recording: the
 upstream experimental tool world declared a logging import that the pinned
 host failed to link. SafeSpend now uses a minimal, explicit compatibility world

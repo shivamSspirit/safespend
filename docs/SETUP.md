@@ -147,9 +147,7 @@ zeroclaw --config-dir "$PWD/.zeroclaw-dev" cron add \
   --allowed-tool memory_recall \
   --allowed-tool memory_store \
   --allowed-tool sop_execute \
-  --allowed-tool sop_advance \
-  --allowed-tool sop_status \
-  'Execute the treasury-monitor SOP now. Use protected config and compact memory only. Send no message when the result is baseline-only and has no alert or finalized activity.'
+  'Call sop_execute exactly once for the treasury-monitor SOP. Its live executor drives the steps. Use protected config and compact memory only. Send no message when the result is baseline-only and has no alert or finalized activity.'
 ```
 
 Run `zeroclaw --config-dir "$PWD/.zeroclaw-dev" cron list` and record the job
@@ -161,6 +159,11 @@ headless SOP cron trigger creates a durable pending run but does not provide the
 agent turn needed to drive generic tool steps. The restricted agent cron
 provides that turn and invokes the SOP, avoiding duplicate pending runs while
 retaining its step contracts, tool scopes, and audit trail.
+
+The read-only `treasury-monitor` SOP uses `execution_mode = "auto"` so its
+agent cron can advance T0 steps without an operator gate. The
+`approved-expense` payment SOP remains `supervised`, includes its own checkpoint,
+and calls a tool that is independently configured as `always_ask`.
 
 The included relative paths assume the daemon starts from the repository root:
 

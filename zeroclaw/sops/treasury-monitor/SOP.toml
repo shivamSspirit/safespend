@@ -1,8 +1,8 @@
 [sop]
 name = "treasury-monitor"
 description = "Poll founder treasury runway and emit only meaningful finalized changes"
-version = "0.1.0"
-execution_mode = "supervised"
+version = "0.1.1"
+execution_mode = "auto"
 cooldown_secs = 240
 max_concurrent = 1
 admission_policy = "coalesce"
