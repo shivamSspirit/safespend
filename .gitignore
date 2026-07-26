@@ -13,6 +13,7 @@ target/
 secrets/
 .state/
 .zeroclaw/
+.zeroclaw-dev/
 node_modules/
 coverage/
 dist/

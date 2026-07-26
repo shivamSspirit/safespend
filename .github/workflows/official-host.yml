@@ -58,7 +58,7 @@ jobs:
       - name: Build minimal official Telegram plugin host
         working-directory: .official/zeroclaw
         run: |
-          cargo build --release --locked --no-default-features \
+          cargo +1.96.1 build --release --locked --no-default-features \
             --features agent-runtime,channel-telegram,plugins-wasm-cranelift
 
       - name: Record binary and plugin CLI proof
