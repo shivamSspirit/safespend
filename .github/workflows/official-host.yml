@@ -36,7 +36,7 @@ jobs:
 
       - name: Build SafeSpend devnet helpers
         run: |
-          cargo build --release --locked \
+          CARGO_PROFILE_RELEASE_LTO=false cargo build --release --locked \
             -p safespend-devnet-setup \
             -p safespend-devnet-exercise
 
