@@ -1,0 +1,15 @@
+[package]
+name = "safespend-devnet-exercise"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Native harness for exercising the production SafeSpend payment policy on devnet"
+publish = false
+
+[dependencies]
+bs58.workspace = true
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+safespend-allowance-pay = { path = "../../plugins/allowance-pay" }
+safespend-core = { path = "../../crates/safespend-core" }
+serde_json.workspace = true
+zeroize.workspace = true

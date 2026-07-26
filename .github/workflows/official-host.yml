@@ -30,9 +30,12 @@ jobs:
 
       - name: Build and verify SafeSpend components
         run: |
+          echo "$(brew --prefix openssl@3)/bin" >> "$GITHUB_PATH"
           rustup show
           ./scripts/build-plugins.sh
-          ./scripts/verify-release.sh
+
+      - name: Verify signatures and WASM digests
+        run: ./scripts/verify-release.sh
 
       - name: Check out pinned official ZeroClaw
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2

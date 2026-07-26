@@ -70,9 +70,28 @@ cargo run --locked -p safespend-devnet-setup -- \
 ```
 
 The command refuses every genesis hash except devnet and has no override. It
-prints the Subscription Authority and recurring-delegation PDA needed by
-protected config. The second run validates and reuses the existing Subscription
-Authority. Record both delegation outputs without recording the founder key.
+first confirms Subscription Authority initialization, reads the real deployed
+program `init_id`, and only then creates the recurring delegation. It prints
+both transaction signatures and the PDA needed by protected config. The second
+run validates and reuses the existing Subscription Authority. Record both
+delegation outputs without recording the founder key.
+
+To exercise the exact native payment engine used by the WASM plugin before
+connecting Telegram, create an ignored JSON object containing the non-secret
+plugin section values, then run:
+
+```bash
+cargo run --locked -p safespend-devnet-exercise -- \
+  --config .dev/devnet-payment-config.json \
+  --session-keypair /absolute/path/outside/repo/session.json \
+  --vendor hosting \
+  --amount 12000000
+```
+
+The harness reads the session key from an absolute path, never accepts it on
+the command line, and reports every RPC method plus the number of
+`sendTransaction` invocations. It is an integration aid, not a substitute for
+the required official ZeroClaw and Telegram evidence.
 
 ## 4. Configure ZeroClaw
 

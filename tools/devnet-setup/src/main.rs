@@ -17,7 +17,7 @@ use subscriptions::{
     SUBSCRIPTIONS_ID,
 };
 
-const DEVNET_GENESIS: &str = "EtWTRABZaYq6iMfeYKouRu166VU2xqa1";
+const DEVNET_GENESIS: &str = "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG";
 const TOKEN_PROGRAM: Address = address!("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
 const SYSTEM_PROGRAM: Address = address!("11111111111111111111111111111111");
 
@@ -64,32 +64,37 @@ fn run() -> Result<(), Box<dyn Error>> {
     let existing_authority = client
         .get_account_with_commitment(&subscription_authority, CommitmentConfig::confirmed())?
         .value;
-    if let Some(account) = &existing_authority {
-        if account.owner != SUBSCRIPTIONS_ID {
-            return Err("existing Subscription Authority has the wrong program owner".into());
+    let authority_created = existing_authority.is_none();
+    let authority_setup_signature = if authority_created {
+        let instruction = InitSubscriptionAuthority {
+            owner: treasury_owner,
+            subscription_authority,
+            token_mint: mint,
+            user_ata: treasury_token_account,
+            system_program: SYSTEM_PROGRAM,
+            token_program: TOKEN_PROGRAM,
+            payer: None,
         }
-        let decoded = SubscriptionAuthority::from_bytes(&account.data)
-            .map_err(|_| "existing Subscription Authority is malformed")?;
-        if decoded.user != treasury_owner || decoded.token_mint != mint {
-            return Err("existing Subscription Authority does not match treasury and mint".into());
-        }
-    }
+        .instruction();
+        Some(send_instruction(
+            &client,
+            &treasury,
+            &treasury_owner,
+            instruction,
+        )?)
+    } else {
+        None
+    };
 
-    let mut instructions = Vec::with_capacity(2);
-    if existing_authority.is_none() {
-        instructions.push(
-            InitSubscriptionAuthority {
-                owner: treasury_owner,
-                subscription_authority,
-                token_mint: mint,
-                user_ata: treasury_token_account,
-                system_program: SYSTEM_PROGRAM,
-                token_program: TOKEN_PROGRAM,
-                payer: None,
-            }
-            .instruction(),
-        );
-    }
+    // The deployed v0.4.0 program requires the authority's real init_id.
+    // Fetch it only after the initialization transaction is confirmed.
+    let authority_account = client
+        .get_account_with_commitment(&subscription_authority, CommitmentConfig::confirmed())?
+        .value
+        .ok_or("Subscription Authority is missing after initialization")?;
+    let decoded_authority = decode_authority(&authority_account, &treasury_owner, &mint)?;
+    let authority_init_id = decoded_authority.init_id;
+
     let create = CreateRecurringDelegation {
         delegator: treasury_owner,
         subscription_authority,
@@ -105,21 +110,10 @@ fn run() -> Result<(), Box<dyn Error>> {
             period_length_s: period_seconds,
             start_ts: 0,
             expiry_ts,
-            // Safe only because initialization and creation are atomic in this
-            // fresh-blockhash transaction. No durable nonce is used.
-            expected_subscription_authority_init_id: i64::MIN,
+            expected_subscription_authority_init_id: authority_init_id,
         },
     });
-    instructions.push(create);
-
-    let blockhash = client.get_latest_blockhash()?;
-    let transaction = Transaction::new_signed_with_payer(
-        &instructions,
-        Some(&treasury_owner),
-        &[&treasury],
-        blockhash,
-    );
-    let signature = client.send_and_confirm_transaction(&transaction)?;
+    let delegation_setup_signature = send_instruction(&client, &treasury, &treasury_owner, create)?;
 
     println!(
         "{}",
@@ -130,16 +124,50 @@ fn run() -> Result<(), Box<dyn Error>> {
             "mint": mint.to_string(),
             "session_delegate": delegate.to_string(),
             "subscription_authority": subscription_authority.to_string(),
+            "subscription_authority_init_id": authority_init_id,
             "recurring_delegation": recurring_delegation.to_string(),
             "delegation_nonce": nonce,
-            "subscription_authority_created": existing_authority.is_none(),
+            "subscription_authority_created": authority_created,
+            "authority_setup_signature": authority_setup_signature.map(|signature| signature.to_string()),
             "amount_per_period_base_units": amount,
             "period_seconds": period_seconds,
             "expiry_ts": expiry_ts,
-            "setup_signature": signature.to_string()
+            "delegation_setup_signature": delegation_setup_signature.to_string()
         })
     );
     Ok(())
+}
+
+fn decode_authority(
+    account: &solana_account::Account,
+    treasury_owner: &Address,
+    mint: &Address,
+) -> Result<SubscriptionAuthority, Box<dyn Error>> {
+    if account.owner != SUBSCRIPTIONS_ID {
+        return Err("Subscription Authority has the wrong program owner".into());
+    }
+    let decoded = SubscriptionAuthority::from_bytes(&account.data)
+        .map_err(|_| "Subscription Authority is malformed")?;
+    if decoded.user != *treasury_owner || decoded.token_mint != *mint {
+        return Err("Subscription Authority does not match treasury and mint".into());
+    }
+    Ok(decoded)
+}
+
+fn send_instruction(
+    client: &RpcClient,
+    treasury: &impl Signer,
+    treasury_owner: &Address,
+    instruction: solana_instruction::Instruction,
+) -> Result<solana_signature::Signature, Box<dyn Error>> {
+    let blockhash = client.get_latest_blockhash()?;
+    let transaction = Transaction::new_signed_with_payer(
+        &[instruction],
+        Some(treasury_owner),
+        &[&treasury],
+        blockhash,
+    );
+    Ok(client.send_and_confirm_transaction(&transaction)?)
 }
 
 fn find_recurring_delegation_pda(
@@ -202,6 +230,14 @@ fn parse_i64(args: &HashMap<String, String>, name: &str) -> Result<i64, Box<dyn 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn devnet_genesis_hash_is_complete() {
+        assert_eq!(
+            DEVNET_GENESIS,
+            "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG"
+        );
+    }
 
     #[test]
     fn nonce_changes_the_pda() {

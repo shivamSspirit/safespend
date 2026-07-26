@@ -71,5 +71,9 @@ See:
 
 ## Public evidence
 
-Repository, transaction, video, and Discord links must be inserted here only
-after the corresponding live artifacts exist.
+- Repository: https://github.com/shivamSspirit/safespend
+- Finalized devnet payment:
+  https://explorer.solana.com/tx/4pZXVVud1ocKpTeDxLhqufYEKcUfu4CpGggSxBcp5vWNVizmZeSCJ4PHCk8HktcqgorcPrLoUj12KvusRzKsnijJ?cluster=devnet
+- Devnet evidence: `evidence/devnet/2026-07-26-runway-lock.md`
+- Video: pending real Telegram-to-ZeroClaw recording
+- Discord showcase: pending video publication

@@ -13,20 +13,20 @@ Never replace a pending row with a claim unless its public artifact exists.
 | WASI component build | Verified locally | `./scripts/build-plugins.sh` |
 | Publisher signatures and component SHA-256 | Verified locally | `./scripts/verify-release.sh` |
 | Current official ZeroClaw source revision | Pinned | `f3023663a08f668dcec60c8d6d6db7777c86955a` |
-| Official-host feature build | CI workflow added; public run pending | `.github/workflows/official-host.yml` |
+| Official-host feature build | Public CI workflow; latest run must be green | `.github/workflows/official-host.yml` |
 
 ## Live evidence
 
 | Evidence | Status | Required public reference |
 |---|---|---|
 | Telegram `/status` through official ZeroClaw | Pending | Sanitized transcript/video timestamp |
-| Hosting allowance payment submitted on devnet | Pending | Explorer transaction URL |
+| Hosting allowance payment finalized on devnet | Verified | `evidence/devnet/2026-07-26-runway-lock.md` |
 | Watcher observes finalized debit and 8.800 weeks | Pending | Transcript/video timestamp |
-| Separate contractor allowance rejected at 7.600 weeks | Pending | Transcript/video timestamp plus allowance account |
-| Malicious wallet override rejected before tool call | Pending | Prompt-injection transcript/video timestamp |
+| Separate contractor allowance rejected at 7.600 weeks | Plugin boundary verified; Telegram pending | `evidence/devnet/2026-07-26-runway-lock.md` |
+| Malicious wallet override rejected before tool call | Plugin boundary verified; Telegram pending | Prompt-injection transcript/video timestamp |
 | Repeated authentic founder-treasury monitoring | Pending | Dated, redacted operating log |
 | Independent clean setup | Pending | Tester, environment, elapsed time, corrections |
-| Public repository | Pending until first push | Repository URL and commit |
+| Public repository | Live | `https://github.com/shivamSspirit/safespend` |
 | Showcase video | Pending | Public or unlisted URL under three minutes |
 | Discord showcase | Pending | Message URL |
 

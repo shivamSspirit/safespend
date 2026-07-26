@@ -5,6 +5,7 @@ members = [
     "plugins/treasury-watch",
     "plugins/allowance-pay",
     "tools/burn-calibrator",
+    "tools/devnet-exercise",
     "tools/devnet-setup",
 ]
 

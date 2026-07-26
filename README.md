@@ -22,9 +22,10 @@ actually spend, while a separate runway lock protects company survival.
 - **ZeroClaw operation:** a Telegram skill, five-minute monitoring SOP,
   human-approval checkpoint, runtime `always_ask` gate, narrow tool allowlist,
   and compact persistent memory.
-- **Devnet provisioning:** a founder-authorized CLI atomically creates the
-  Subscription Authority and recurring delegation. The founder key is used by
-  this one offline setup command and never enters ZeroClaw.
+- **Devnet provisioning:** a founder-authorized CLI creates and confirms the
+  Subscription Authority, reads its deployed-program `init_id`, and then
+  creates the recurring delegation. The founder key is used by this offline
+  setup command and never enters ZeroClaw.
 - **Burn calibration:** an offline, read-only CLI backfills a bounded window of
   finalized canonical-token history, counts gross outflows, and emits a hashed
   recommendation for the protected weekly-burn policy.
@@ -76,10 +77,12 @@ crates/safespend-core/       Pure policy, arithmetic, and watcher logic
 plugins/treasury-watch/      T0 ZeroClaw WASM tool
 plugins/allowance-pay/       Onchain-capped payment WASM tool
 tools/devnet-setup/          Founder-authorized devnet provisioning CLI
+tools/devnet-exercise/       Native harness for the production payment engine
 tools/burn-calibrator/       Finalized-history burn-policy calibration CLI
 wit/v0/                      Pinned ZeroClaw plugin interface
 zeroclaw/                    Skill, SOPs, and example runtime configuration
 docs/                        Architecture, setup, tests, threat model, demo
+evidence/devnet/             Public, sanitized onchain integration evidence
 ```
 
 ## Build and test

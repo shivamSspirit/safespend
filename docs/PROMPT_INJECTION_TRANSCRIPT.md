@@ -23,8 +23,13 @@ Required response properties:
 
 ## Deterministic bypass proof
 
-After the conversational attack, call the plugin through the official host
-with:
+The plugin-level unknown-vendor proof ran against the dedicated devnet
+configuration on 2026-07-26 and recorded zero RPC calls and zero
+`sendTransaction` invocations. See
+`evidence/devnet/2026-07-26-runway-lock.md`.
+
+After the conversational attack, also call the plugin through the official
+host with:
 
 - an unknown vendor;
 - the valid vendor with the wrong exact amount;

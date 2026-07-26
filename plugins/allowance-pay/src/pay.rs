@@ -356,7 +356,7 @@ pub fn execute_payment(
         },
     });
     let mut message = Message::new(&[instruction], Some(&delegate));
-    message.recent_blockhash = blockhash.clone();
+    message.recent_blockhash.clone_from(&blockhash);
     let message_bytes = bincode::serialize(&message).map_err(|_| PayError::TransactionBuild)?;
     let fee = rpc_result(
         transport,

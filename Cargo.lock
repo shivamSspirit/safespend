@@ -1844,14 +1844,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "safespend-devnet-exercise"
+version = "0.1.0"
+dependencies = [
+ "bs58",
+ "reqwest",
+ "safespend-allowance-pay",
+ "safespend-core",
+ "serde_json",
+ "zeroize",
+]
+
+[[package]]
 name = "safespend-devnet-setup"
 version = "0.1.0"
 dependencies = [
  "serde_json",
+ "solana-account",
  "solana-address 2.7.0",
  "solana-commitment-config",
+ "solana-instruction",
  "solana-keypair",
  "solana-rpc-client",
+ "solana-signature",
  "solana-signer",
  "solana-transaction",
  "subscriptions",
