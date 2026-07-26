@@ -143,6 +143,10 @@ zeroclaw --config-dir "$PWD/.zeroclaw-dev" \
   config set channels.telegram.guardian.bot_token
 ```
 
+Enter the value manually in a real terminal after the complete masked prompt
+appears. Do not pipe or automate secret entry through a pseudo-terminal: an
+automation that sends before terminal echo is disabled can disclose the value.
+
 Run secret enrollment before screen recording. Never append the token to that
 command, export it in the shell, or place it in an `.env` file. If it is ever
 visible in a terminal, trace, screenshot, or video, revoke it with BotFather

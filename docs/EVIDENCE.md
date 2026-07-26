@@ -12,18 +12,19 @@ Never replace a pending row with a claim unless its public artifact exists.
 | Historical burn calibration parsing and conservative rounding | Verified locally | `cargo test --locked -p safespend-burn-calibrator` |
 | WASI component build | Verified locally | `./scripts/build-plugins.sh` |
 | Publisher signatures, approved WASM, and source-input digest | Verified locally and in CI | `./scripts/verify-release.sh` |
-| Full-history secret scan, Rust checks, and RustSec audit | Verified in public CI | `https://github.com/shivamSspirit/safespend/actions/runs/30206395384` |
+| Full-history secret scan, Rust checks, and RustSec audit | Verified in public CI | `https://github.com/shivamSspirit/safespend/actions/runs/30207903668` |
 | Current official ZeroClaw source revision | Pinned | `f3023663a08f668dcec60c8d6d6db7777c86955a` |
-| Official-host feature build and strict plugin discovery | Verified in public CI | `https://github.com/shivamSspirit/safespend/actions/runs/30206294334` and `evidence/official-zeroclaw/2026-07-26-host-proof.md` |
+| Official host and native devnet-helper build | Verified in public CI | `https://github.com/shivamSspirit/safespend/actions/runs/30207903693` and `evidence/official-zeroclaw/2026-07-26-host-proof.md` |
 | Official agent → WASM watcher → finalized devnet RPC | Verified | `evidence/official-zeroclaw/2026-07-26-host-proof.md` |
 | Official cron → monitoring SOP → watcher → compact memory | Verified | `evidence/official-zeroclaw/2026-07-26-host-proof.md` |
+| Fresh isolated 100-token demo state and key rotation | Verified on devnet | `evidence/devnet/2026-07-26-demo-reset.md` |
 
 ## Live evidence
 
 | Evidence | Status | Required public reference |
 |---|---|---|
 | Telegram `/status` through official ZeroClaw | Pending | Sanitized transcript/video timestamp |
-| Hosting allowance payment finalized on devnet | Verified | `evidence/devnet/2026-07-26-runway-lock.md` |
+| Historical hosting allowance payment finalized on devnet | Verified; retired state | `evidence/devnet/2026-07-26-runway-lock.md` |
 | Watcher observes finalized debit and 8.800 weeks | Pending | Transcript/video timestamp |
 | Separate contractor allowance rejected at 7.600 weeks | Plugin boundary verified; Telegram pending | `evidence/devnet/2026-07-26-runway-lock.md` |
 | Malicious wallet override rejected before tool call | Official agent verified; Telegram pending | `docs/PROMPT_INJECTION_TRANSCRIPT.md` and video timestamp |

@@ -1,5 +1,10 @@
 # Devnet runway-lock evidence — 2026-07-26
 
+This is a completed historical proof. Its token account and session were
+retired after a later local enrollment-safety test; the token account and
+session SOL balance are now both zero. The isolated state prepared for the
+Telegram recording is documented in `2026-07-26-demo-reset.md`.
+
 This is public, reproducible evidence from a dedicated SafeSpend demonstration
 environment. It contains no founder key, session key, Telegram token, or RPC
 credential.

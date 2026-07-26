@@ -11,14 +11,21 @@ Telegram demonstration. It contains no runtime credential or private key.
 - Pinned upstream ZeroClaw commit:
   `f3023663a08f668dcec60c8d6d6db7777c86955a`
 - Public successful build:
-  `https://github.com/shivamSspirit/safespend/actions/runs/30206294334`
+  `https://github.com/shivamSspirit/safespend/actions/runs/30207903693`
 - Workflow artifact: `safespend-official-zeroclaw-macos-arm64`
 - Official host version: `zeroclaw 0.8.3`
 - Downloaded host SHA-256:
   `4db3479275e439caca306878c72e727819d900418997d80b86504bea177774c5`
+- Downloaded devnet setup helper SHA-256:
+  `48bfd086234be6690ad9ff04388c53767662fd8e10d1f22189466c193efff8b1`
+- Downloaded devnet exercise helper SHA-256:
+  `c35a31badc3edca3f865523df9e543811f837d3ba28e4528e14edb559369778e`
 
 The host was compiled from the pinned official ZeroClaw source with
 `agent-runtime`, `channel-telegram`, and `plugins-wasm-cranelift`.
+The two SafeSpend devnet helpers were compiled on the same macOS arm64 runner
+without receiving any private key. Their downloaded hashes were checked before
+they read local mode-`0600` devnet key files.
 
 ## Strict plugin discovery
 
