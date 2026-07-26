@@ -34,6 +34,12 @@ jobs:
           rustup show
           ./scripts/build-plugins.sh
 
+      - name: Build SafeSpend devnet helpers
+        run: |
+          cargo build --release --locked \
+            -p safespend-devnet-setup \
+            -p safespend-devnet-exercise
+
       - name: Verify signatures and WASM digests
         run: ./scripts/verify-release.sh
 
@@ -70,6 +76,11 @@ jobs:
           "$host" sop --help | tee official-host-evidence/sop-help.txt
           shasum -a 256 "$host" | tee official-host-evidence/zeroclaw-SHA256.txt
           cp "$host" official-host-evidence/zeroclaw
+          for helper in safespend-devnet-setup safespend-devnet-exercise; do
+            cp "$PWD/target/release/$helper" "official-host-evidence/$helper"
+            shasum -a 256 "official-host-evidence/$helper" \
+              | tee "official-host-evidence/$helper-SHA256.txt"
+          done
 
       - name: Upload official host proof
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
