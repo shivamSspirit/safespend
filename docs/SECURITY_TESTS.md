@@ -47,7 +47,7 @@ result, and transaction signature (when any) for every case.
 | Delta below threshold | no noisy alert |
 | First watcher run | baseline only, no invented delta |
 | Submitted but not finalized | agent says `submitted` |
-| Built WASM differs from publisher-signed digest | release verification fails |
+| Approved WASM, manifest, or tracked plugin input differs from signed digest | release verification fails |
 | Credential pattern appears anywhere in Git history | Gitleaks CI job fails |
 
 ## Automated coverage

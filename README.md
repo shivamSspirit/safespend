@@ -104,8 +104,11 @@ cargo test --workspace --locked
 ./scripts/build-plugins.sh
 ```
 
-The generated component artifacts are staged under `dist/plugins/` and are not
-committed. Continue with [the devnet setup guide](docs/SETUP.md).
+Fresh, platform-dependent build candidates are staged under `dist/plugins/`
+and are not committed. ZeroClaw loads the reviewed package in
+`release/plugins/`; its exact manifests, WASM bytes, and tracked source inputs
+are bound by the publisher-signed digest. Continue with
+[the devnet setup guide](docs/SETUP.md).
 
 ## Safety status
 

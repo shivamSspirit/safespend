@@ -73,7 +73,7 @@ procedural_memory_enabled = false
 [plugins]
 enabled = true
 auto_discover = true
-plugins_dir = "./dist/plugins"
+plugins_dir = "./release/plugins"
 max_plugins = 4
 
 [plugins.security]

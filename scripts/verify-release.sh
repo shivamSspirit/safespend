@@ -2,12 +2,12 @@
 set -euo pipefail
 
 project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-dist_dir="${1:-"$project_root/dist/plugins"}"
+artifact_dir="${1:-"$project_root/release/plugins"}"
 trusted_key_file="${2:-"$project_root/release/trusted-publisher-key.txt"}"
 trusted_digests="$project_root/release/plugin-SHA256SUMS"
 trusted_digest_signature="$project_root/release/plugin-SHA256SUMS.sig"
 
-for command in openssl awk perl sed tr; do
+for command in openssl awk cmp git perl sed sort tr; do
   command -v "$command" >/dev/null || {
     echo "required command is unavailable: $command" >&2
     exit 2
@@ -84,7 +84,7 @@ decode_base64url() {
 }
 
 for plugin in safespend-treasury-watch safespend-allowance-pay; do
-  manifest="$dist_dir/$plugin/manifest.toml"
+  manifest="$artifact_dir/$plugin/manifest.toml"
   [[ -f "$manifest" ]] || {
     echo "missing manifest: $manifest" >&2
     exit 1
@@ -140,19 +140,32 @@ openssl pkeyutl \
   >/dev/null
 echo "verified trusted WASM digest signature"
 
-if [[ ! -f "$dist_dir/SHA256SUMS" ]]; then
-  echo "missing generated release digest file: $dist_dir/SHA256SUMS" >&2
+{
+  git -C "$project_root" ls-files \
+    Cargo.lock \
+    Cargo.toml \
+    rust-toolchain.toml \
+    'crates/**' \
+    'plugins/**' \
+    'wit/**' \
+    scripts/build-plugins.sh
+  printf '%s\n' \
+    release/plugins/safespend-allowance-pay/manifest.toml \
+    release/plugins/safespend-allowance-pay/safespend_allowance_pay.wasm \
+    release/plugins/safespend-treasury-watch/manifest.toml \
+    release/plugins/safespend-treasury-watch/safespend_treasury_watch.wasm
+} | LC_ALL=C sort >"$temporary_dir/expected-inputs"
+awk '{print $2}' "$trusted_digests" >"$temporary_dir/signed-inputs"
+if ! cmp -s "$temporary_dir/expected-inputs" "$temporary_dir/signed-inputs"; then
+  echo "signed release input inventory does not match the tracked plugin inputs" >&2
+  diff -u "$temporary_dir/expected-inputs" "$temporary_dir/signed-inputs" || true
   exit 1
 fi
-if ! cmp -s "$trusted_digests" "$dist_dir/SHA256SUMS"; then
-  echo "built WASM digests do not match the signed release digests" >&2
-  diff -u "$trusted_digests" "$dist_dir/SHA256SUMS" || true
-  exit 1
-fi
+
 if command -v sha256sum >/dev/null; then
-  (cd "$dist_dir" && sha256sum --check "$trusted_digests")
+  (cd "$project_root" && sha256sum --check "$trusted_digests")
 elif command -v shasum >/dev/null; then
-  (cd "$dist_dir" && shasum -a 256 --check "$trusted_digests")
+  (cd "$project_root" && shasum -a 256 --check "$trusted_digests")
 else
   echo "sha256sum or shasum is required" >&2
   exit 2

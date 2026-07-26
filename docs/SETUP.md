@@ -25,12 +25,20 @@ cargo clippy --workspace --all-targets --locked -- -D warnings
 ./scripts/build-plugins.sh
 ```
 
-Confirm that each `dist/plugins/<name>/` directory contains its manifest and
-WASM component, then verify the trusted publisher and exact artifacts:
+Confirm that each `dist/plugins/<name>/` directory contains a newly built
+candidate. Production configuration does not load these unsigned candidates.
+Verify the checked-in, publisher-approved package and its exact source inputs:
 
 ```bash
 ./scripts/verify-release.sh
 ```
+
+The example ZeroClaw config loads `release/plugins/`, not `dist/plugins/`.
+Rust WASM output can differ across build hosts even with pinned source and
+toolchain, so SafeSpend does not claim cross-platform reproducible bytes.
+Instead, the offline publisher explicitly approves one reviewed package; its
+WASM, manifests, and complete tracked plugin-source inventory are covered by
+the signed digest.
 
 ## 3. Create the onchain cap
 

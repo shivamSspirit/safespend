@@ -36,8 +36,9 @@ The implementation was checked against these primary sources:
   artifact SHA-256.
 
 SafeSpend implements both controls. CI verifies manifest signatures using the
-same Ed25519 canonicalization contract, verifies the committed release digest
-signature, and rejects a build whose generated WASM digest differs from that
-trusted file.
+same Ed25519 canonicalization contract and verifies a committed release digest
+signature over the explicitly approved WASM package, manifests, and complete
+tracked plugin-source inventory. The runtime loads that package rather than a
+platform-dependent build directory.
 
 These notes are a source-review record, not an audit of any upstream project.

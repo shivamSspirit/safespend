@@ -68,14 +68,16 @@ delegation and rotate the session key immediately.
 Controls: dependencies are locked, CI actions are pinned to immutable commit
 hashes, RustSec runs in CI, plugin WIT is pinned, and production must enable
 ZeroClaw strict publisher verification. A separately committed SHA-256 file is
-signed by the same offline publisher identity, and CI requires every rebuilt
-WASM byte to match it because ZeroClaw manifest signatures do not cover WASM
-bytes.
+signed by the same offline publisher identity and binds the reviewed WASM
+package, manifests, and complete tracked plugin-source inventory because
+ZeroClaw manifest signatures do not cover WASM bytes. Runtime configuration
+loads only the reviewed package, never an incidental build directory.
 
 Residual risk: the publisher key proves which manifest was approved, while the
-signed release digest proves the exact WASM bytes. Release operators must
-verify both, review any deliberate digest update, and protect the signing key
-outside the repository.
+signed release digest proves the exact approved WASM bytes and source inputs.
+Rust WASM output is not assumed to be byte-reproducible across build hosts.
+Release operators must verify both layers, review any deliberate package or
+digest update, and protect the signing key outside the repository.
 
 ### Duplicate or concurrent payment
 

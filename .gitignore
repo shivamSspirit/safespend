@@ -5,6 +5,7 @@
 target/
 **/target/
 *.wasm
+!release/plugins/**/*.wasm
 *.cwasm
 *.key
 *.pem
