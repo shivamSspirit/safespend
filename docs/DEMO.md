@@ -59,7 +59,11 @@ with: “Onchain permission is necessary. Protected runway is decisive.”
 ## Capture checklist
 
 - use a clean devnet wallet and sanitized terminal;
+- finish masked token enrollment and founder-only Telegram pairing before
+  recording; use a private bot conversation, never a public group;
 - hide Telegram token, session secret, RPC credentials, and local paths;
+- keep the daemon startup pairing code, config file, environment, and auth
+  status out of frame;
 - increase terminal and phone font size;
 - pre-fund fee SOL and verify Explorer before recording;
 - keep a backup recording, but make the submitted cut one continuous flow;

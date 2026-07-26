@@ -12,8 +12,9 @@ Never replace a pending row with a claim unless its public artifact exists.
 | Historical burn calibration parsing and conservative rounding | Verified locally | `cargo test --locked -p safespend-burn-calibrator` |
 | WASI component build | Verified locally | `./scripts/build-plugins.sh` |
 | Publisher signatures, approved WASM, and source-input digest | Verified locally and in CI | `./scripts/verify-release.sh` |
+| Full-history secret scan, Rust checks, and RustSec audit | Verified in public CI | `https://github.com/shivamSspirit/safespend/actions/runs/30206395384` |
 | Current official ZeroClaw source revision | Pinned | `f3023663a08f668dcec60c8d6d6db7777c86955a` |
-| Official-host feature build and strict plugin discovery | Verified | `evidence/official-zeroclaw/2026-07-26-host-proof.md` |
+| Official-host feature build and strict plugin discovery | Verified in public CI | `https://github.com/shivamSspirit/safespend/actions/runs/30206294334` and `evidence/official-zeroclaw/2026-07-26-host-proof.md` |
 | Official agent → WASM watcher → finalized devnet RPC | Verified | `evidence/official-zeroclaw/2026-07-26-host-proof.md` |
 | Official cron → monitoring SOP → watcher → compact memory | Verified | `evidence/official-zeroclaw/2026-07-26-host-proof.md` |
 

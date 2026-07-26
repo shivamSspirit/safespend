@@ -11,7 +11,7 @@ Telegram demonstration. It contains no runtime credential or private key.
 - Pinned upstream ZeroClaw commit:
   `f3023663a08f668dcec60c8d6d6db7777c86955a`
 - Public successful build:
-  `https://github.com/shivamSspirit/safespend/actions/runs/30205115470`
+  `https://github.com/shivamSspirit/safespend/actions/runs/30206294334`
 - Workflow artifact: `safespend-official-zeroclaw-macos-arm64`
 - Official host version: `zeroclaw 0.8.3`
 - Downloaded host SHA-256:

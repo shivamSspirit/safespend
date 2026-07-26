@@ -135,6 +135,27 @@ ZeroClaw's config UI or `zeroclaw config set`, so the secret-marked fields are
 encrypted. Do not commit plaintext replacements and do not paste either secret
 into Telegram.
 
+For the Telegram token, omit the value so ZeroClaw obtains it from its masked
+interactive prompt instead of a command-line argument or shell environment:
+
+```bash
+zeroclaw --config-dir "$PWD/.zeroclaw-dev" \
+  config set channels.telegram.guardian.bot_token
+```
+
+Run secret enrollment before screen recording. Never append the token to that
+command, export it in the shell, or place it in an `.env` file. If it is ever
+visible in a terminal, trace, screenshot, or video, revoke it with BotFather
+before continuing.
+
+On the first daemon start, ZeroClaw prints a one-time Telegram pairing code
+because no external peer is trusted yet. Send `/bind <code>` to the bot from
+the founder's private Telegram conversation. Confirm ZeroClaw persists that
+account, restart the daemon, and verify the founder can still use the bot while
+a second unpaired account is rejected. Do not configure a wildcard peer. Keep
+the startup pairing code and the resulting local peer configuration out of the
+recording.
+
 Install the monitoring schedule as an agent prompt, restricted to the watcher,
 memory, and SOP lifecycle tools:
 
