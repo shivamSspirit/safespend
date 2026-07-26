@@ -1,0 +1,21 @@
+[package]
+name = "safespend-treasury-watch"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "T0 ZeroClaw treasury watcher for SafeSpend"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+safespend-core = { path = "../../crates/safespend-core" }
+bs58.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+wit-bindgen.workspace = true
+
+[target.'cfg(target_family = "wasm")'.dependencies]
+waki = { version = "0.5.1", features = ["json"] }

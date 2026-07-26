@@ -1,0 +1,12 @@
+[sop]
+name = "approved-expense"
+description = "Human-gated runway-locked submission of one onchain-capped founder expense"
+version = "0.1.0"
+execution_mode = "supervised"
+cooldown_secs = 0
+max_concurrent = 1
+admission_policy = "hold"
+max_pending_approvals = 1
+
+[[triggers]]
+type = "manual"

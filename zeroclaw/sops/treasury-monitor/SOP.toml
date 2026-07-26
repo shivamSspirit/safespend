@@ -1,0 +1,15 @@
+[sop]
+name = "treasury-monitor"
+description = "Poll founder treasury runway and emit only meaningful finalized changes"
+version = "0.1.0"
+execution_mode = "supervised"
+cooldown_secs = 240
+max_concurrent = 1
+admission_policy = "coalesce"
+
+[[triggers]]
+type = "cron"
+expression = "*/5 * * * *"
+
+[[triggers]]
+type = "manual"

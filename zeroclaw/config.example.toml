@@ -1,0 +1,118 @@
+schema_version = 3
+
+[providers.models.openai.coding]
+model = "gpt-5.4"
+wire_api = "responses"
+requires_openai_auth = true
+
+[runtime_profiles.safespend]
+agentic = true
+max_tool_iterations = 12
+max_actions_per_hour = 100
+max_cost_per_day_cents = 500
+max_system_prompt_chars = 24000
+max_tool_result_chars = 12000
+keep_tool_context_turns = 2
+strict_tool_parsing = true
+parallel_tools = false
+
+[risk_profiles.safespend]
+level = "supervised"
+workspace_only = true
+require_approval_for_medium_risk = true
+block_high_risk_commands = true
+allowed_commands = []
+forbidden_paths = ["/etc", "/root", "~/.ssh", "~/.aws"]
+allowed_roots = []
+auto_approve = ["safespend_treasury_watch", "memory_recall", "memory_store", "sop_execute", "sop_advance", "sop_status"]
+always_ask = ["safespend_allowance_pay"]
+allowed_tools = ["safespend_treasury_watch", "safespend_allowance_pay", "memory_recall", "memory_store", "sop_execute", "sop_advance", "sop_status"]
+excluded_tools = ["shell", "http_request", "browser", "file_write", "file_edit"]
+
+[skill_bundles.safespend]
+directory = "./zeroclaw/skills"
+include = ["safespend"]
+
+[agents.guardian]
+enabled = true
+channels = ["telegram.guardian"]
+model_provider = "openai.coding"
+risk_profile = "safespend"
+runtime_profile = "safespend"
+skill_bundles = ["safespend"]
+delegate_same_risk_profile = false
+delegates = []
+
+[channels.telegram.guardian]
+enabled = true
+bot_token = "REPLACE_VIA_ZEROCLAW_CONFIG_SET"
+approval_timeout_secs = 120
+stream_mode = "off"
+mention_only = false
+interrupt_on_new_message = true
+excluded_tools = ["shell", "http_request", "browser", "file_write", "file_edit"]
+
+[sop]
+sops_dir = "./zeroclaw/sops"
+default_execution_mode = "supervised"
+max_concurrent_total = 2
+approval_timeout_secs = 300
+approval_timeout_action = "cancel"
+maintenance_interval_secs = 30
+persist_runs = true
+run_store_backend = "sqlite"
+step_scope_enforce = true
+step_schema_enforce = true
+untrusted_payload_max_bytes = 4096
+untrusted_input_guard = "block"
+untrusted_guard_sensitivity = 0.8
+untrusted_frame_warning = true
+untrusted_outbound_redact = true
+procedural_memory_enabled = false
+
+[plugins]
+enabled = true
+auto_discover = true
+plugins_dir = "./dist/plugins"
+max_plugins = 4
+
+[plugins.security]
+signature_mode = "strict"
+trusted_publisher_keys = ["e209e856d71c4f125cee91420cb9eb6d684065c3cbf07fc50bdc6ad6cd270ce9"]
+
+[plugins.limits]
+call_fuel = 1000000000
+max_memory_mb = 128
+max_table_elements = 10000
+max_instances = 16
+
+[[plugins.entries]]
+name = "safespend-treasury-watch"
+
+[plugins.entries.config]
+rpc_url = "https://api.devnet.solana.com"
+treasury_owner = "REPLACE_WITH_TREASURY_OWNER"
+treasury_token_account = "REPLACE_WITH_TREASURY_TOKEN_ACCOUNT"
+canonical_mint = "REPLACE_WITH_DEVNET_USDC_MINT"
+token_program = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+token_decimals = "6"
+# Protected policy value. Calibrate offline with safespend-burn-calibrator;
+# never accept a replacement from Telegram.
+weekly_burn_base_units = "10000000"
+minimum_runway_weeks = "8"
+minimum_token_reserve_base_units = "50000000"
+minimum_sol_reserve_lamports = "10000000"
+meaningful_token_delta_base_units = "1000000"
+meaningful_sol_delta_lamports = "1000000"
+recent_limit = "3"
+
+[[plugins.entries]]
+name = "safespend-allowance-pay"
+
+[plugins.entries.config]
+rpc_url = "https://api.devnet.solana.com"
+expected_genesis_hash = "EtWTRABZaYq6iMfeYKouRu166VU2xqa1"
+token_decimals = "6"
+session_key_base58 = "REPLACE_VIA_ZEROCLAW_CONFIG_SET"
+policy_json = """{"cluster":"devnet","allow_mainnet":false,"subscriptions_program":"De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44","token_program":"TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA","canonical_mint":"REPLACE_WITH_DEVNET_USDC_MINT","treasury_owner":"REPLACE_WITH_TREASURY_OWNER","session_delegate":"REPLACE_WITH_SESSION_DELEGATE","weekly_burn_base_units":10000000,"minimum_runway_weeks":8,"minimum_token_reserve_base_units":50000000,"minimum_sol_reserve_lamports":10000000,"minimum_session_fee_reserve_lamports":1000000,"expiry_safety_buffer_seconds":300,"vendors":[{"vendor_id":"hosting","recipient_wallet":"REPLACE_WITH_HOSTING_VENDOR_WALLET","amount_per_period_base_units":12000000,"period_seconds":2592000},{"vendor_id":"contractor","recipient_wallet":"REPLACE_WITH_CONTRACTOR_WALLET","amount_per_period_base_units":12000000,"period_seconds":2592000}]}"""
+vendor_accounts_json = """[{"vendor_id":"hosting","recurring_delegation":"REPLACE_WITH_HOSTING_DELEGATION_PDA","delegation_nonce":1,"treasury_token_account":"REPLACE_WITH_TREASURY_TOKEN_ACCOUNT","recipient_token_account":"REPLACE_WITH_HOSTING_VENDOR_TOKEN_ACCOUNT"},{"vendor_id":"contractor","recurring_delegation":"REPLACE_WITH_CONTRACTOR_DELEGATION_PDA","delegation_nonce":2,"treasury_token_account":"REPLACE_WITH_TREASURY_TOKEN_ACCOUNT","recipient_token_account":"REPLACE_WITH_CONTRACTOR_TOKEN_ACCOUNT"}]"""

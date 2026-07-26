@@ -1,0 +1,25 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+target/
+**/target/
+*.wasm
+*.cwasm
+*.key
+*.pem
+*.seed
+*.keypair.json
+secrets/
+.state/
+.zeroclaw/
+node_modules/
+coverage/
+dist/
+.superstack/
+competitive-landscape.html
+safespend-validation.html
+
+# Local development host checkouts and generated fixtures.
+.dev/
+tmp/

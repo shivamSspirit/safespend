@@ -1,0 +1,31 @@
+[package]
+name = "safespend-allowance-pay"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "T2 bounded Solana allowance payment tool for ZeroClaw"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+safespend-core = { path = "../../crates/safespend-core" }
+base64.workspace = true
+bincode.workspace = true
+bs58.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+solana-address = { version = "2.6.0", features = ["borsh", "copy", "curve25519", "decode"] }
+solana-hash = "4.0"
+solana-keypair = "3.1"
+solana-message = { version = "3.0", features = ["serde"] }
+solana-signer = "3.0"
+solana-transaction = { version = "3.0", features = ["bincode"] }
+subscriptions = "=0.4.0"
+thiserror.workspace = true
+wit-bindgen.workspace = true
+zeroize.workspace = true
+
+[target.'cfg(target_family = "wasm")'.dependencies]
+waki = { version = "0.5.1", features = ["json"] }

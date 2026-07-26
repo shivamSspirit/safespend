@@ -1,0 +1,76 @@
+name: Official ZeroClaw host proof
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/official-host.yml"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "crates/**"
+      - "plugins/**"
+      - "scripts/**"
+      - "wit/**"
+      - "zeroclaw/**"
+
+permissions:
+  contents: read
+
+env:
+  ZEROCLAW_REF: f3023663a08f668dcec60c8d6d6db7777c86955a
+
+jobs:
+  macos-arm64:
+    runs-on: macos-14
+    timeout-minutes: 60
+    steps:
+      - name: Check out SafeSpend
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Build and verify SafeSpend components
+        run: |
+          rustup show
+          ./scripts/build-plugins.sh
+          ./scripts/verify-release.sh
+
+      - name: Check out pinned official ZeroClaw
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: zeroclaw-labs/zeroclaw
+          ref: ${{ env.ZEROCLAW_REF }}
+          path: .official/zeroclaw
+
+      - name: Install official ZeroClaw Rust toolchain
+        uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # stable
+        with:
+          toolchain: 1.96.1
+
+      - name: Cache official host build
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          workspaces: .official/zeroclaw
+          key: official-host-${{ env.ZEROCLAW_REF }}
+
+      - name: Build minimal official Telegram plugin host
+        working-directory: .official/zeroclaw
+        run: |
+          cargo build --release --locked --no-default-features \
+            --features agent-runtime,channel-telegram,plugins-wasm-cranelift
+
+      - name: Record binary and plugin CLI proof
+        run: |
+          host="$PWD/.official/zeroclaw/target/release/zeroclaw"
+          mkdir -p official-host-evidence
+          "$host" --version | tee official-host-evidence/version.txt
+          "$host" plugin --help | tee official-host-evidence/plugin-help.txt
+          "$host" sop --help | tee official-host-evidence/sop-help.txt
+          shasum -a 256 "$host" | tee official-host-evidence/zeroclaw-SHA256.txt
+          cp "$host" official-host-evidence/zeroclaw
+
+      - name: Upload official host proof
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: safespend-official-zeroclaw-macos-arm64
+          path: official-host-evidence/
+          retention-days: 7

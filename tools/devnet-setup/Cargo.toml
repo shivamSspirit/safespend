@@ -1,0 +1,18 @@
+[package]
+name = "safespend-devnet-setup"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Offline-authorized devnet recurring allowance setup for SafeSpend"
+publish = false
+
+[dependencies]
+serde_json.workspace = true
+solana-address = { version = "2.6.0", features = ["borsh", "copy", "curve25519", "decode"] }
+solana-commitment-config = "3.1"
+solana-keypair = "3.1"
+solana-rpc-client = "3.1.8"
+solana-signer = "3.0"
+solana-transaction = { version = "3.0", features = ["bincode"] }
+subscriptions = "=0.4.0"
+
