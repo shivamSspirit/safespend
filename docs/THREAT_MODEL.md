@@ -67,12 +67,15 @@ delegation and rotate the session key immediately.
 
 Controls: dependencies are locked, CI actions are pinned to immutable commit
 hashes, RustSec runs in CI, plugin WIT is pinned, and production must enable
-ZeroClaw strict publisher verification. Release archives must also publish a
-SHA-256 digest because ZeroClaw manifest signatures do not cover WASM bytes.
+ZeroClaw strict publisher verification. A separately committed SHA-256 file is
+signed by the same offline publisher identity, and CI requires every rebuilt
+WASM byte to match it because ZeroClaw manifest signatures do not cover WASM
+bytes.
 
 Residual risk: the publisher key proves which manifest was approved, while the
-separate release digest proves the exact WASM bytes. Release operators must
-verify both and protect the signing key outside the repository.
+signed release digest proves the exact WASM bytes. Release operators must
+verify both, review any deliberate digest update, and protect the signing key
+outside the repository.
 
 ### Duplicate or concurrent payment
 

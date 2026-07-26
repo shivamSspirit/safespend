@@ -38,7 +38,8 @@ simulating, signing, and submitting the permitted pull.
 
 - real Telegram channel;
 - signed Rust `wasm32-wasip2` tools;
-- cron-triggered treasury monitoring SOP;
+- a restricted five-minute ZeroClaw agent cron that invokes the treasury
+  monitoring SOP;
 - persistent compact memory and restart-safe activity cursors;
 - human SOP checkpoint and runtime `always_ask` approval;
 - strict plugin publisher trust and bounded WASM execution.

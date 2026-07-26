@@ -47,6 +47,8 @@ result, and transaction signature (when any) for every case.
 | Delta below threshold | no noisy alert |
 | First watcher run | baseline only, no invented delta |
 | Submitted but not finalized | agent says `submitted` |
+| Built WASM differs from publisher-signed digest | release verification fails |
+| Credential pattern appears anywhere in Git history | Gitleaks CI job fails |
 
 ## Automated coverage
 
@@ -54,8 +56,9 @@ The Rust suite exercises pure authorization, rollover, runway boundary,
 runway overflow resistance, reserve, watcher, RPC parsing, transaction, and
 setup-PDA cases. One scenario proves that a first vendor payment succeeds and
 a separate still-unspent allowance is rejected after the balance falls below
-the eight-week runway floor. CI additionally runs formatting, strict Clippy,
-locked tests, WASI component builds, signature/digest checks, and RustSec.
+the eight-week runway floor. CI additionally runs full-history secret scanning,
+formatting, strict Clippy, locked tests, WASI component builds,
+publisher-signed artifact checks, and RustSec.
 
 The Telegram prompt attack, two approval surfaces, daemon restart, live
 duplicate submission, and finalized post-payment observation are end-to-end

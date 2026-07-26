@@ -1,0 +1,12 @@
+title = "SafeSpend secret scanning"
+
+# These values are intentionally public cryptographic identifiers:
+# - a dedicated devnet SPL token account recorded in public test evidence
+# - the Ed25519 publisher public key used to verify plugin releases
+# Keep this allowlist value-specific. Never allowlist whole files or generic key formats.
+[allowlist]
+description = "Public devnet and plugin-verification identifiers"
+regexes = [
+  '''\b8ri1mCQk79fJBRwhHunHAXJZjp54BzeGtaZGQGaWtyXE\b''',
+  '''\be209e856d71c4f125cee91420cb9eb6d684065c3cbf07fc50bdc6ad6cd270ce9\b''',
+]

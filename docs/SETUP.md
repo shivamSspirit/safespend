@@ -127,6 +127,33 @@ ZeroClaw's config UI or `zeroclaw config set`, so the secret-marked fields are
 encrypted. Do not commit plaintext replacements and do not paste either secret
 into Telegram.
 
+Install the monitoring schedule as an agent prompt, restricted to the watcher,
+memory, and SOP lifecycle tools:
+
+```bash
+zeroclaw --config-dir "$PWD/.zeroclaw-dev" cron add \
+  '*/5 * * * *' \
+  --agent guardian \
+  --prompt \
+  --allowed-tool safespend_treasury_watch \
+  --allowed-tool memory_recall \
+  --allowed-tool memory_store \
+  --allowed-tool sop_execute \
+  --allowed-tool sop_advance \
+  --allowed-tool sop_status \
+  'Execute the treasury-monitor SOP now. Use protected config and compact memory only. Send no message when the result is baseline-only and has no alert or finalized activity.'
+```
+
+Run `zeroclaw --config-dir "$PWD/.zeroclaw-dev" cron list` and record the job
+id and next-run time. Do this once; adding the command repeatedly creates
+duplicate jobs.
+
+The SOP itself intentionally has a manual trigger. In current ZeroClaw, a
+headless SOP cron trigger creates a durable pending run but does not provide the
+agent turn needed to drive generic tool steps. The restricted agent cron
+provides that turn and invokes the SOP, avoiding duplicate pending runs while
+retaining its step contracts, tool scopes, and audit trail.
+
 The included relative paths assume the daemon starts from the repository root:
 
 ```bash
@@ -185,19 +212,22 @@ After changing either manifest, re-sign both from the repository root:
 ```bash
 ./scripts/sign-plugins.sh /absolute/offline/path/plugin-publisher-ed25519.pk8
 ./scripts/build-plugins.sh
+./scripts/sign-release-digests.sh /absolute/offline/path/plugin-publisher-ed25519.pk8
 ./scripts/verify-release.sh
 ```
 
-The signing script refuses a private key stored anywhere inside this
-repository. If rotating the publisher identity, also replace the sole trusted
-key in `zeroclaw/config.example.toml`; verification fails until they match.
-Never commit, log, or transmit the private key.
+The signing scripts refuse a private key stored anywhere inside this
+repository. The release-digest signature deliberately makes a plugin source
+change fail CI until the newly reviewed WASM bytes are signed. If rotating the
+publisher identity, also replace the sole trusted key in
+`zeroclaw/config.example.toml`; verification fails until they match. Never
+commit, log, or transmit the private key.
 
 ## 8. Mainnet release gate
 
 Do not only change `cluster` and `allow_mainnet`. First:
 
-1. verify the signed manifests and SHA-256 release file;
+1. verify the signed manifests and publisher-signed SHA-256 release file;
 2. confirm strict mode trusts only `release/trusted-publisher-key.txt`;
 3. repeat every threat-model acceptance criterion;
 4. obtain an independent security review.

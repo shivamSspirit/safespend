@@ -1,0 +1,8 @@
+# Security-sensitive release and runtime boundaries require founder review.
+/.github/ @shivamSspirit
+/plugins/ @shivamSspirit
+/release/ @shivamSspirit
+/scripts/ @shivamSspirit
+/zeroclaw/ @shivamSspirit
+/SECURITY.md @shivamSspirit
+/PRIVACY.md @shivamSspirit

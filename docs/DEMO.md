@@ -14,7 +14,8 @@ ZeroClaw never has my founder key; every vendor is also capped onchain.”
 **0:20–0:45 — Useful monitoring**
 
 Send `/status`. Show finalized token/SOL balances, runway, reserves, and a
-compact recent event. Briefly show the five-minute cron SOP.
+compact recent event. Briefly show the restricted five-minute agent cron and
+the monitoring SOP it invokes.
 
 **0:45–1:15 — Attack fails**
 

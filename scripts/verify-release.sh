@@ -4,6 +4,8 @@ set -euo pipefail
 project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 dist_dir="${1:-"$project_root/dist/plugins"}"
 trusted_key_file="${2:-"$project_root/release/trusted-publisher-key.txt"}"
+trusted_digests="$project_root/release/plugin-SHA256SUMS"
+trusted_digest_signature="$project_root/release/plugin-SHA256SUMS.sig"
 
 for command in openssl awk perl sed tr; do
   command -v "$command" >/dev/null || {
@@ -115,14 +117,42 @@ for plugin in safespend-treasury-watch safespend-allowance-pay; do
   echo "verified manifest signature: $plugin"
 done
 
+if [[ ! -f "$trusted_digests" || ! -f "$trusted_digest_signature" ]]; then
+  echo "missing signed, trusted release digests" >&2
+  exit 1
+fi
+digest_signature="$(
+  tr -d '[:space:]' <"$trusted_digest_signature"
+)"
+if [[ -z "$digest_signature" ]]; then
+  echo "trusted release digest signature is empty" >&2
+  exit 1
+fi
+decode_base64url "$digest_signature" >"$temporary_dir/digests.signature"
+openssl pkeyutl \
+  -verify \
+  -pubin \
+  -inkey "$temporary_dir/publisher.der" \
+  -keyform DER \
+  -rawin \
+  -in "$trusted_digests" \
+  -sigfile "$temporary_dir/digests.signature" \
+  >/dev/null
+echo "verified trusted WASM digest signature"
+
 if [[ ! -f "$dist_dir/SHA256SUMS" ]]; then
-  echo "missing release digest file: $dist_dir/SHA256SUMS" >&2
+  echo "missing generated release digest file: $dist_dir/SHA256SUMS" >&2
+  exit 1
+fi
+if ! cmp -s "$trusted_digests" "$dist_dir/SHA256SUMS"; then
+  echo "built WASM digests do not match the signed release digests" >&2
+  diff -u "$trusted_digests" "$dist_dir/SHA256SUMS" || true
   exit 1
 fi
 if command -v sha256sum >/dev/null; then
-  (cd "$dist_dir" && sha256sum --check SHA256SUMS)
+  (cd "$dist_dir" && sha256sum --check "$trusted_digests")
 elif command -v shasum >/dev/null; then
-  (cd "$dist_dir" && shasum -a 256 --check SHA256SUMS)
+  (cd "$dist_dir" && shasum -a 256 --check "$trusted_digests")
 else
   echo "sha256sum or shasum is required" >&2
   exit 2

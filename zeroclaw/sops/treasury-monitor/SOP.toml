@@ -8,8 +8,4 @@ max_concurrent = 1
 admission_policy = "coalesce"
 
 [[triggers]]
-type = "cron"
-expression = "*/5 * * * *"
-
-[[triggers]]
 type = "manual"

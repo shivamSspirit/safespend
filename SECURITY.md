@@ -3,6 +3,11 @@
 SafeSpend is pre-mainnet software. Do not place real funds behind it until the
 release checklist in `docs/SETUP.md` is complete.
 
+Runtime data handling is described in [PRIVACY.md](PRIVACY.md). SafeSpend has
+no web application or hosted database today; any future browser, API, or
+Supabase surface must satisfy
+[docs/WEB_SECURITY_BASELINE.md](docs/WEB_SECURITY_BASELINE.md).
+
 ## Reporting
 
 Please disclose a suspected vulnerability privately to the repository

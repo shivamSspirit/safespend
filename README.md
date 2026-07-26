@@ -19,9 +19,9 @@ actually spend, while a separate runway lock protects company survival.
   program, PDA seeds, mint, token accounts, delegate, period, expiry, reserves,
   weekly burn, post-payment runway, transaction fee, simulation, and returned
   signature.
-- **ZeroClaw operation:** a Telegram skill, five-minute monitoring SOP,
-  human-approval checkpoint, runtime `always_ask` gate, narrow tool allowlist,
-  and compact persistent memory.
+- **ZeroClaw operation:** a Telegram skill, five-minute restricted agent cron
+  that drives the monitoring SOP, human-approval checkpoint, runtime
+  `always_ask` gate, narrow tool allowlist, and compact persistent memory.
 - **Devnet provisioning:** a founder-authorized CLI creates and confirms the
   Subscription Authority, reads its deployed-program `init_id`, and then
   creates the recurring delegation. The founder key is used by this offline
@@ -87,6 +87,10 @@ evidence/devnet/             Public, sanitized onchain integration evidence
 
 Dependency audit policy and the current Solana serialization maintenance
 warning are documented in [docs/DEPENDENCY_POLICY.md](docs/DEPENDENCY_POLICY.md).
+The project also publishes an original [privacy notice](PRIVACY.md). A
+[future web and Supabase security baseline](docs/WEB_SECURITY_BASELINE.md)
+defines mandatory controls if a browser, API, or hosted database is added; no
+such surface exists in the current repository.
 
 ## Build and test
 
@@ -107,9 +111,10 @@ committed. Continue with [the devnet setup guide](docs/SETUP.md).
 
 This repository is devnet-first, pre-mainnet software. Mainnet is disabled by
 default. Both plugin manifests are signed, the example uses strict
-trusted-publisher enforcement, and generated WASM files are covered by
-`SHA256SUMS`. See [the threat model](docs/THREAT_MODEL.md), [security test
-matrix](docs/SECURITY_TESTS.md), and [security policy](SECURITY.md).
+trusted-publisher enforcement, and generated WASM files must match a committed
+publisher-signed digest. See [the threat model](docs/THREAT_MODEL.md),
+[security test matrix](docs/SECURITY_TESTS.md), and [security
+policy](SECURITY.md).
 
 Invoice generation is deliberately outside this submission. The workflow is
 narrow: monitor founder runway, approve an already-budgeted expense, require

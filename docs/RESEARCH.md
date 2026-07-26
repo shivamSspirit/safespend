@@ -35,7 +35,9 @@ The implementation was checked against these primary sources:
   releases therefore need both strict trusted-publisher verification and an
   artifact SHA-256.
 
-SafeSpend implements both controls. CI verifies signatures using the same
-Ed25519 canonicalization contract and checks the generated WASM digest file.
+SafeSpend implements both controls. CI verifies manifest signatures using the
+same Ed25519 canonicalization contract, verifies the committed release digest
+signature, and rejects a build whose generated WASM digest differs from that
+trusted file.
 
 These notes are a source-review record, not an audit of any upstream project.
