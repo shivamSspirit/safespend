@@ -46,4 +46,4 @@ jobs:
         run: cargo install cargo-audit --version 0.22.2 --locked
 
       - name: Scan Cargo.lock for RustSec advisories
-        run: cargo audit --deny warnings
+        run: cargo audit

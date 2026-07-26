@@ -85,6 +85,9 @@ docs/                        Architecture, setup, tests, threat model, demo
 evidence/devnet/             Public, sanitized onchain integration evidence
 ```
 
+Dependency audit policy and the current Solana serialization maintenance
+warning are documented in [docs/DEPENDENCY_POLICY.md](docs/DEPENDENCY_POLICY.md).
+
 ## Build and test
 
 Prerequisites are Rust `1.93.1` and target `wasm32-wasip2`.
