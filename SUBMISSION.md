@@ -1,5 +1,5 @@
 
-# SafeSpend — policy-bound founder payments on Solana(building for educational and showcase scenarios)
+# SafeSpend — policy-bound founder payments on Solana
 
 SafeSpend is a self-hosted treasury operations agent for founders who want the
 convenience of chat-based payments without giving a language model an
