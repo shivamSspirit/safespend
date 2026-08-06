@@ -1282,7 +1282,20 @@ function ActivityView({
                   </strong>
                   <span>
                     {p.runId}
-                    {p.signature ? ` · ${short(p.signature)}` : ""}
+                    {p.signature && (
+                      <>
+                        {" · "}
+                        <a
+                          className="signature-link"
+                          href={`https://explorer.solana.com/tx/${p.signature}?cluster=devnet`}
+                          target="_blank"
+                          rel="noreferrer"
+                          aria-label={`Open transaction ${p.signature} in Solana Explorer`}
+                        >
+                          {short(p.signature)} <ExternalLink size={11} aria-hidden="true" />
+                        </a>
+                      </>
+                    )}
                   </span>
                 </div>
                 <time>{new Date(p.updatedAt).toLocaleTimeString()}</time>

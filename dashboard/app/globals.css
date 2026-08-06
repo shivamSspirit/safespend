@@ -1447,6 +1447,21 @@ input:hover {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.signature-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--brand);
+  text-decoration: none;
+}
+.signature-link:hover {
+  text-decoration: underline;
+}
+.signature-link:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
 .activity-row time {
   color: var(--text-faint);
   font-size: 8px;
