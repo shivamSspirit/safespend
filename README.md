@@ -1,5 +1,5 @@
 # SafeSpend
-(###building for educational and showcase scenarios)
+###building for educational and showcase scenarios);
 
 
 **Policy-bound founder payments on Solana.**
