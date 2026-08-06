@@ -1,7 +1,8 @@
 # SafeSpend
+###(building for educational and showcase scenarios)
+)
 
-**Policy-bound founder payments on Solana.**(building for educational and showcase scenarios)
-
+**Policy-bound founder payments on Solana.**
 SafeSpend is a self-hosted treasury operations agent for founders on Solana. It
 works through Telegram and a local founder dashboard, monitors finalized
 treasury balances, calculates company runway, and submits only preconfigured
