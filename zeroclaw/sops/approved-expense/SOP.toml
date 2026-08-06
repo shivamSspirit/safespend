@@ -1,8 +1,13 @@
 [sop]
 name = "approved-expense"
 description = "Human-gated runway-locked submission of one onchain-capped founder expense"
-version = "0.1.0"
-execution_mode = "supervised"
+version = "0.2.0"
+# The explicit checkpoint is the only SOP-level founder approval. Auto mode is
+# intentional: supervised mode also gates step 1, which allowed the step's LLM
+# executor to race the gate resolver and could launch payment approval early.
+# The payment tool still has a second, independent Telegram approval through
+# the payer risk profile.
+execution_mode = "auto"
 cooldown_secs = 0
 max_concurrent = 1
 admission_policy = "hold"

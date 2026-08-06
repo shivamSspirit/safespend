@@ -1,80 +1,84 @@
-# SafeSpend — Runway-Locked Treasury Autopilot
 
-> A self-hosted founder agent that pays an approved business expense only when
-> both the onchain allowance and the company's protected runway floor permit
-> it.
+# SafeSpend — policy-bound founder payments on Solana(building for educational and showcase scenarios)
 
-## The job
+SafeSpend is a self-hosted treasury operations agent for founders who want the
+convenience of chat-based payments without giving a language model an
+open-ended wallet. From Telegram or a local dashboard, a founder can check
+runway and request a known operating expense. SafeSpend submits only an exact,
+preconfigured vendor payment that passes both an onchain allowance and a
+founder-owned runway policy.
 
-Solo founders regularly pay infrastructure providers and contractors from a
-small stablecoin treasury. An allowance can prevent an agent from exceeding a
-vendor budget, but it cannot answer the business question that matters most:
-can this expense be paid now without endangering the company's survival?
+## What it does and who it is for
 
-SafeSpend runs inside ZeroClaw and talks to the founder through Telegram. It
-monitors a pinned Solana treasury, calculates runway from a protected weekly
-burn policy, and submits only exact recurring vendor payments that satisfy two
-independent conditions:
+Founders often pay the same small set of expenses — hosting, contractors, and
+software — from a token treasury. An allowance prevents overspending a vendor
+budget, but it does not answer the business question: can the company afford
+this payment today? SafeSpend requires both conditions:
 
-1. the founder-created Solana recurring delegation permits the expense;
-2. the finalized post-payment balance still funds the protected minimum runway.
+1. The founder-created Solana recurring delegation permits the exact payment.
+2. The finalized post-payment balance remains above the protected runway floor.
 
-The winning demonstration starts with 100 tokens and a 10-token weekly burn.
-A 12-token hosting payment succeeds, leaving 8.800 weeks. A second contractor
-has its own active, unspent 12-token allowance, but SafeSpend rejects that
-payment because the resulting 7.600 weeks would violate the eight-week floor.
-A malicious Telegram message that supplies an attacker wallet and asks to
-override policy is rejected before the payment tool is called.
+The flow has two human boundaries. A `/pay <vendor-id> <amount-base-units>`
+request creates an `approved-expense` SOP checkpoint. After the founder clears
+it, Telegram presents a separate approval for the bounded payment tool. Only
+then does the isolated payer re-read finalized Devnet state, simulate a fresh
+transaction, sign it, submit it, and verify finality.
 
-## Why Solana
+A completed Devnet payment demonstrates the full path: Telegram request, SOP
+approval, payment-tool approval, submitted signature, and finalized treasury
+observation. See the [public Devnet transaction](https://explorer.solana.com/tx/2otdDdEreWpjQRF8pP3bNbj7esDMsCBv439WqUDbcfnJRgsSYi6vZApkapwGsr2C8rJNQRuirMLaPHig95wGMxoD?cluster=devnet)
+and its [sanitized operator transcript](evidence/devnet/2026-08-05-telegram-payment.md).
 
-The allowance is not a database flag. Solana's Subscriptions and Allowances
-program enforces the delegate, mint, amount, cadence, and expiry onchain. The
-agent cannot exceed that outer boundary even if its host is compromised.
-SafeSpend adds a stricter founder-owned survival policy before constructing,
-simulating, signing, and submitting the permitted pull.
+## ZeroClaw composition
 
-## ZeroClaw features
+SafeSpend uses ZeroClaw as the local agent host, not as the custody boundary:
+the Telegram channel accepts founder commands; narrow guardian and payer agents
+run the workflow; [SOPs](zeroclaw/sops/) create an auditable founder checkpoint;
+runtime tool approval gates submission; and reviewed Rust WASM plugins watch
+finalized balances and execute the bounded payment operation. The local Next.js
+[dashboard](dashboard/) reads the same SOP and Devnet state, so it is a second
+founder surface rather than a separate payment backend.
 
-- real Telegram channel;
-- signed Rust `wasm32-wasip2` tools;
-- a restricted five-minute ZeroClaw agent cron that invokes the treasury
-  monitoring SOP;
-- persistent compact memory and restart-safe activity cursors;
-- human SOP checkpoint and runtime `always_ask` approval;
-- strict plugin publisher trust and bounded WASM execution.
+## Custody tier and threat model
 
-## Custody and threat model
+SafeSpend is **T2: bounded sign and submit**. The founder key never enters
+ZeroClaw. A separate session key has fee SOL only and can act solely through
+founder-created recurring delegations in Solana's Subscriptions program.
 
-SafeSpend is T2. ZeroClaw never receives the founder key. A separate session
-key contains fee SOL only and can act solely through founder-created recurring
-delegations. The payment core validates finalized state, cluster genesis,
-program owners, PDA seeds, canonical mint, token authorities, vendor mapping,
-exact amount, period, expiry, reserves, fee budget, and post-payment runway. It
-simulates the exact signed transaction before submission and never retries
-automatically.
+Immediately before signing, the payer verifies finalized cluster identity,
+programs, mint, treasury, recipient token account, delegation PDA, delegate,
+period, remaining allowance, token/SOL reserves, and
+`post-payment balance >= weekly burn × runway floor`. A spent vendor allowance
+is unavailable in both the dashboard and the payment API. A compromised host
+could access the limited session key, but the onchain delegation remains a
+finite, mint-specific, recipient-specific outer cap.
 
-The weekly burn is protected configuration. A read-only calibrator can derive
-a conservative recommendation from a complete bounded window of finalized
-gross outflows, but Telegram and the model cannot modify payment policy.
+Natural language is never authority: chat cannot provide a recipient, mint,
+amount override, policy, or private key. A real Telegram prompt-injection test
+sent an attacker wallet plus “ignore policy” instructions; it was rejected with
+zero tool calls, no SOP, and no transaction. See the
+[transcript](docs/PROMPT_INJECTION_TRANSCRIPT.md),
+[threat model](docs/THREAT_MODEL.md), and
+[security test matrix](docs/SECURITY_TESTS.md). Trust assumptions are declared:
+ZeroClaw/local host, Telegram, Solana RPC, the model provider, and the
+Subscriptions program. No MCP payment facilitator is in the signing path.
 
-## Reproduce
+## Reproduce on Devnet
 
-See:
+Start with the [judge fast path](README.md#judge-fast-path-three-minutes-to-verify-longer-for-a-personal-setup):
+`cargo test --workspace --locked`, `./scripts/verify-release.sh`, then inspect
+the public Devnet transaction. A personal Telegram payment environment takes
+longer because it intentionally requires a founder key, test mint, vendor
+accounts, recurring delegations, bot, model login, and masked secrets.
 
-- `README.md`
-- `docs/SETUP.md`
-- `docs/BURN_POLICY.md`
-- `docs/THREAT_MODEL.md`
-- `docs/SECURITY_TESTS.md`
-- `docs/EVIDENCE.md`
-- `docs/DEMO.md`
+For the complete setup, use [docs/SETUP.md](docs/SETUP.md), copy
+[zeroclaw/config.example.toml](zeroclaw/config.example.toml) into ignored
+`.zeroclaw-dev/config.toml`, and follow the exact [approved-expense
+SOP](zeroclaw/sops/approved-expense). The payment policy and finalized checks
+are in [plugins/allowance-pay](plugins/allowance-pay); provisioning is in
+[tools/devnet-setup](tools/devnet-setup). All secrets are redacted: local
+runtime config, wallet keypairs, Telegram tokens, RPC credentials, and session
+keys are never committed.
 
-## Public evidence
-
-- Repository: https://github.com/shivamSspirit/safespend
-- Finalized devnet payment:
-  https://explorer.solana.com/tx/4pZXVVud1ocKpTeDxLhqufYEKcUfu4CpGggSxBcp5vWNVizmZeSCJ4PHCk8HktcqgorcPrLoUj12KvusRzKsnijJ?cluster=devnet
-- Devnet evidence: `evidence/devnet/2026-07-26-runway-lock.md`
-- Video: pending real Telegram-to-ZeroClaw recording
-- Discord showcase: pending video publication
+SafeSpend currently runs on Solana Devnet only. Mainnet is intentionally
+disabled.

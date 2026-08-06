@@ -1,0 +1,27 @@
+{
+  "name": "safespend-founder-dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -H 127.0.0.1",
+    "build": "next build",
+    "start": "next start -H 127.0.0.1",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write \"{app,components,lib}/**/*.{ts,tsx,css}\" \"*.{md,json,ts}\"",
+    "format:check": "prettier --check \"{app,components,lib}/**/*.{ts,tsx,css}\" \"*.{md,json,ts}\""
+  },
+  "dependencies": {
+    "lucide-react": "latest",
+    "next": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "zod": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "prettier": "^3.9.6",
+    "typescript": "latest"
+  }
+}

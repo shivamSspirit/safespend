@@ -82,9 +82,10 @@ Before calling the payment tool:
    amount, period, reserves, weekly burn, post-payment runway, and delegate.”
 3. Start the `approved-expense` SOP with only those two values in its payload.
 4. Do not approve the SOP yourself.
-5. After the operator clears the SOP checkpoint, call
-   `safespend_allowance_pay`. The runtime must also show its always-ask tool
-   approval. Do not bypass or summarize away either gate.
+5. After the operator clears the SOP checkpoint, let the SOP's isolated payer
+   step call `safespend_allowance_pay` exactly once. The runtime must also show
+   its always-ask tool approval. Do not call `sop_advance` for the payer step,
+   and do not bypass or summarize away either gate.
 6. Return the submitted signature, policy hash, post-payment balance, and
    post-payment runway compared with the protected floor. Ask the operator to
    wait for finalized confirmation from the monitoring run.

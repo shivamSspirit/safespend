@@ -11,7 +11,7 @@ use subscriptions::{
     accounts::SubscriptionAuthority,
     instructions::{
         CreateRecurringDelegation, CreateRecurringDelegationInstructionArgs,
-        InitSubscriptionAuthority,
+        InitSubscriptionAuthority, RevokeDelegation,
     },
     types::CreateRecurringDelegationData,
     SUBSCRIPTIONS_ID,
@@ -46,6 +46,37 @@ fn run() -> Result<(), Box<dyn Error>> {
     let treasury = read_keypair_file(required(&args, "treasury-keypair")?)
         .map_err(|_| "could not read treasury keypair")?;
     let treasury_owner = treasury.pubkey();
+
+    if let Some(value) = args.get("revoke-delegation") {
+        let delegation_account = parse_address(value)?;
+        let account = client
+            .get_account_with_commitment(&delegation_account, CommitmentConfig::confirmed())?
+            .value
+            .ok_or("delegation account does not exist")?;
+        if account.owner != SUBSCRIPTIONS_ID {
+            return Err("delegation account has the wrong program owner".into());
+        }
+        let signature = send_instruction(
+            &client,
+            &treasury,
+            &treasury_owner,
+            RevokeDelegation {
+                authority: treasury_owner,
+                delegation_account,
+            }
+            .instruction(),
+        )?;
+        println!(
+            "{}",
+            serde_json::json!({
+                "cluster": "devnet",
+                "revoked_delegation": delegation_account.to_string(),
+                "revoke_signature": signature.to_string()
+            })
+        );
+        return Ok(());
+    }
+
     let mint = parse_address(required(&args, "mint")?)?;
     let treasury_token_account = parse_address(required(&args, "treasury-token-account")?)?;
     let delegate = parse_address(required(&args, "session-delegate")?)?;

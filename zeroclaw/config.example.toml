@@ -25,12 +25,33 @@ allowed_commands = []
 forbidden_paths = ["/etc", "/root", "~/.ssh", "~/.aws"]
 allowed_roots = []
 auto_approve = ["safespend_treasury_watch", "memory_recall", "memory_store", "sop_execute", "sop_advance", "sop_status"]
+always_ask = []
+allowed_tools = ["safespend_treasury_watch", "memory_recall", "memory_store", "sop_execute", "sop_advance", "sop_status"]
+excluded_tools = ["safespend_allowance_pay", "shell", "http_request", "browser", "file_write", "file_edit"]
+
+[risk_profiles.safespend_payer]
+level = "supervised"
+workspace_only = true
+require_approval_for_medium_risk = true
+block_high_risk_commands = true
+allowed_commands = []
+forbidden_paths = ["/etc", "/root", "~/.ssh", "~/.aws"]
+allowed_roots = []
+auto_approve = ["sop_status"]
 always_ask = ["safespend_allowance_pay"]
-allowed_tools = ["safespend_treasury_watch", "safespend_allowance_pay", "memory_recall", "memory_store", "sop_execute", "sop_advance", "sop_status"]
+allowed_tools = ["safespend_allowance_pay", "sop_status"]
 excluded_tools = ["shell", "http_request", "browser", "file_write", "file_edit"]
 
+# Cross-channel T2 boundary: dashboard/daemon-started payments must still be
+# approved by the founder in the live Telegram channel. Missing or unreachable
+# Telegram fails closed; it never falls back to the initiating surface.
+[risk_profiles.safespend_payer.approval_route]
+approver_channel = "telegram.guardian:REPLACE_WITH_FOUNDER_CHAT_ID"
+on_no_approver = "deny"
+timeout_secs = 120
+
 [skill_bundles.safespend]
-directory = "./zeroclaw/skills"
+directory = "shared/skills"
 include = ["safespend"]
 
 [agents.guardian]
@@ -43,6 +64,19 @@ skill_bundles = ["safespend"]
 delegate_same_risk_profile = false
 delegates = []
 
+# This agent has no inbound channel. Only the post-checkpoint payment step of
+# approved-expense selects it, which prevents the Telegram-facing guardian from
+# calling the payment tool directly.
+[agents.payer]
+enabled = true
+channels = []
+model_provider = "openai.coding"
+risk_profile = "safespend_payer"
+runtime_profile = "safespend"
+skill_bundles = []
+delegate_same_risk_profile = false
+delegates = []
+
 [channels.telegram.guardian]
 enabled = true
 bot_token = "REPLACE_VIA_ZEROCLAW_CONFIG_SET"
@@ -50,7 +84,7 @@ approval_timeout_secs = 120
 stream_mode = "off"
 mention_only = false
 interrupt_on_new_message = true
-excluded_tools = ["shell", "http_request", "browser", "file_write", "file_edit"]
+excluded_tools = ["safespend_allowance_pay", "shell", "http_request", "browser", "file_write", "file_edit"]
 
 [sop]
 sops_dir = "./zeroclaw/sops"
@@ -69,6 +103,17 @@ untrusted_guard_sensitivity = 0.8
 untrusted_frame_warning = true
 untrusted_outbound_redact = true
 procedural_memory_enabled = false
+
+# The founder receives and resolves the supervised SOP gate in Telegram.
+# Channel-qualified membership prevents the same numeric sender id on another
+# platform or Telegram alias from satisfying this policy.
+[sop.approval.groups.founder]
+members = ["channel:telegram.guardian:REPLACE_WITH_FOUNDER_TELEGRAM_USER_ID"]
+
+[sop.approval.policies.founder_telegram]
+required_group = "founder"
+quorum = 1
+request_route = "telegram.guardian:REPLACE_WITH_FOUNDER_CHAT_ID"
 
 [plugins]
 enabled = true

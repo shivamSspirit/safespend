@@ -16,12 +16,28 @@ secrets/
 .zeroclaw/
 .zeroclaw-dev/
 node_modules/
+.next/
+dashboard/.safespend/
+*.tsbuildinfo
 coverage/
 dist/
 .superstack/
 competitive-landscape.html
 safespend-validation.html
+wallets/
+keypairs/
 
 # Local development host checkouts and generated fixtures.
 .dev/
 tmp/
+
+.state/
+dashboard/.safespend/
+*.db
+*.db-shm
+*.db-wal
+*.jsonl
+
+
+
+

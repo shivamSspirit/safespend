@@ -84,6 +84,19 @@ both transaction signatures and the PDA needed by protected config. The second
 run validates and reuses the existing Subscription Authority. Record both
 delegation outputs without recording the founder key.
 
+If a test delegation was created with the wrong amount, period, delegate, or
+recipient mapping, revoke it before creating a replacement:
+
+```bash
+cargo run --locked -p safespend-devnet-setup -- \
+  --rpc https://api.devnet.solana.com \
+  --treasury-keypair /absolute/path/outside/repo/founder.json \
+  --revoke-delegation DELEGATION_PDA
+```
+
+The revoke path is also Devnet-only, verifies that the account belongs to the
+Subscriptions program, and requires the treasury owner signature.
+
 To exercise the exact native payment engine used by the WASM plugin before
 connecting Telegram, create an ignored JSON object containing the non-secret
 plugin section values, then run:
@@ -114,6 +127,8 @@ From the repository root:
 ```bash
 mkdir -p .zeroclaw-dev
 cp zeroclaw/config.example.toml .zeroclaw-dev/config.toml
+mkdir -p .zeroclaw-dev/shared/skills
+cp -R zeroclaw/skills/safespend .zeroclaw-dev/shared/skills/safespend
 ```
 
 Replace every public `REPLACE_WITH_...` value:
@@ -134,6 +149,11 @@ Import the Telegram token and base58-encoded 64-byte session key through
 ZeroClaw's config UI or `zeroclaw config set`, so the secret-marked fields are
 encrypted. Do not commit plaintext replacements and do not paste either secret
 into Telegram.
+
+The SafeSpend skill bundle is deliberately copied below the ZeroClaw config
+directory. Current ZeroClaw releases resolve relative skill-bundle paths under
+that installation root and require them to remain below `shared/`; do not point
+the bundle directly at the repository's `zeroclaw/skills` directory.
 
 For the Telegram token, omit the value so ZeroClaw obtains it from its masked
 interactive prompt instead of a command-line argument or shell environment:
@@ -187,13 +207,18 @@ retaining its step contracts, tool scopes, and audit trail.
 
 The read-only `treasury-monitor` SOP uses `execution_mode = "auto"` so its
 agent cron can advance T0 steps without an operator gate. The
-`approved-expense` payment SOP remains `supervised`, includes its own checkpoint,
-and calls a tool that is independently configured as `always_ask`.
+`approved-expense` payment SOP also uses `auto`, but its first step is an
+explicit founder-policy checkpoint. This is important: combining a supervised
+start gate with a separate executable first step can race the gate resolver.
+Only after the explicit checkpoint resolves does the isolated payer step run;
+its payment tool is independently configured as `always_ask`.
 
-The included relative paths assume the daemon starts from the repository root:
+The included relative paths assume the daemon starts from the repository root.
+Use the guarded launcher so an already-running gateway cannot accidentally
+leave a second Telegram channel runtime active:
 
 ```bash
-zeroclaw --config-dir "$PWD/.zeroclaw-dev" daemon
+./scripts/run-zeroclaw-dev.sh
 ```
 
 Before startup, validate the active config using the exact ZeroClaw revision
