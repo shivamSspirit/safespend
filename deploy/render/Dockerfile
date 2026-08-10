@@ -10,6 +10,7 @@ COPY dashboard/package.json dashboard/package-lock.json ./
 RUN --mount=type=cache,target=/root/.npm npm ci
 
 FROM dashboard-deps AS dashboard-builder
+ENV SAFESPEND_DEPLOY_TARGET=render
 COPY dashboard/ ./
 RUN npm run build
 
