@@ -7,10 +7,13 @@
     "build": "next build",
     "start": "next start -H 127.0.0.1",
     "typecheck": "tsc --noEmit",
+    "test:policy": "node --import tsx --test lib/server/vendor-policy-canonical.test.ts lib/server/vendor-enrollment-transaction.test.ts lib/treasury-math.test.ts",
     "format": "prettier --write \"{app,components,lib}/**/*.{ts,tsx,css}\" \"*.{md,json,ts}\"",
     "format:check": "prettier --check \"{app,components,lib}/**/*.{ts,tsx,css}\" \"*.{md,json,ts}\""
   },
   "dependencies": {
+    "@solana/web3.js": "^1.98.4",
+    "bs58": "^6.0.0",
     "lucide-react": "latest",
     "next": "latest",
     "react": "latest",
@@ -22,6 +25,7 @@
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "prettier": "^3.9.6",
+    "tsx": "^4.23.12",
     "typescript": "latest"
   }
 }

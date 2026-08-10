@@ -22,13 +22,27 @@ export function apiError(error: unknown) {
       },
       { status: 400 },
     );
+  console.error("[safespend-api] unexpected server error", error);
   const message = error instanceof Error ? error.message : "Unexpected dashboard error.";
-  const safeMessage =
-    message.includes("protected") ||
-    message.includes("SafeSpend") ||
-    message.includes("Vendor") ||
-    message.includes("Amount")
-      ? message
-      : "SafeSpend refused the operation. Check the local server log.";
+  const safeDomainFragments = [
+    "amount",
+    "delegation",
+    "founder",
+    "policy",
+    "protected",
+    "recipient",
+    "rpc",
+    "safespend",
+    "solana",
+    "token account",
+    "treasury",
+    "vendor",
+    "wallet",
+  ];
+  const safeMessage = safeDomainFragments.some((fragment) =>
+    message.toLowerCase().includes(fragment),
+  )
+    ? message
+    : "SafeSpend refused the operation. Check the local server log.";
   return NextResponse.json({ error: safeMessage, code: "SAFESPEND_ERROR" }, { status: 500 });
 }

@@ -3,10 +3,11 @@
 Next.js App Router dashboard connected to the real SafeSpend ZeroClaw runtime and Solana Devnet.
 Founders can begin from Telegram or the dashboard while sharing one SOP and onchain state machine:
 
-1. Create an approved-expense request.
-2. Approve the SOP checkpoint.
-3. Approve the payment tool invocation in Telegram.
-4. Observe submission with a transaction signature.
+1. Enroll a vendor by signing an immutable policy message and finite delegation in the founder
+   wallet. The service never receives the founder key.
+2. Wait for finalized delegation verification and atomic policy publication.
+3. Create an approved-expense request for an active vendor.
+4. Approve the SOP checkpoint and the separate payment tool invocation in Telegram.
 5. Record success only after finalized confirmation.
 
 There is no demo-data fallback. If ZeroClaw, the audit store, or Devnet cannot be read, the UI shows
@@ -55,11 +56,14 @@ npm run build
 
 ## Data boundary
 
-This is a T2 operation: the local ZeroClaw daemon can sign and submit with a limited Devnet session
-key. The browser cannot. The dashboard is loopback-only and its server adapter keeps the gateway
-bearer, RPC URL, session key, Telegram bot token, and model credentials out of client responses.
+This is a T2 operation: the local ZeroClaw daemon can sign and submit payments with a limited Devnet
+session key. For policy administration, the browser asks an injected founder wallet to sign the
+exact public policy message and delegation transaction. The key remains in the wallet; the loopback
+server receives only signed bytes and submits them to its pinned Devnet RPC. The server keeps the
+gateway bearer, RPC URL, session key, Telegram bot token, and model credentials out of client
+responses.
 
-The dashboard accepts only an exact configured `vendorId` and exact allowance. It creates
+The dashboard accepts only an active founder-signed `vendorId` and exact allowance. It creates
 `approved-expense` directly through the gateway, can clear that SOP checkpoint, and then routes the
 separate `safespend_allowance_pay` approval to `telegram.guardian`. Missing Telegram, timeout,
 malformed input, wrong network, wrong mint, wrong recipient, wrong allowance, or insufficient runway

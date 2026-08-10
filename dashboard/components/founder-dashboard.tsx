@@ -8,6 +8,7 @@ import {
   Check,
   CheckCircle2,
   ChevronRight,
+  Clock3,
   Copy,
   ExternalLink,
   LayoutDashboard,
@@ -16,6 +17,7 @@ import {
   Menu,
   Moon,
   PanelLeftClose,
+  Pencil,
   Plus,
   RefreshCw,
   Search,
@@ -24,19 +26,31 @@ import {
   SlidersHorizontal,
   Sun,
   TerminalSquare,
+  Trash2,
   Users,
+  WalletCards,
   WifiOff,
   X,
   XCircle,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Transaction } from "@solana/web3.js";
 import type {
   ApiErrorBody,
   LivePayment,
   LiveVendor,
   SafeSpendBootstrap,
+  VendorCadence,
+  VendorEnrollmentProposal,
+  VendorEnrollmentResult,
+  VendorPolicyAction,
 } from "@/lib/safespend-types";
+import {
+  calculateTreasuryMetrics,
+  calculateVendorHistory,
+  isFinalizedPayment,
+} from "@/lib/treasury-math";
 
 type View = "overview" | "payments" | "vendors" | "activity" | "settings";
 type Connection = { gatewayOnline: boolean; paired: boolean; gatewayPaired: boolean };
@@ -70,6 +84,9 @@ function cadence(seconds: number) {
   const days = Math.round(seconds / 86_400);
   return days === 7 ? "Weekly" : days === 30 ? "Monthly" : `Every ${days} days`;
 }
+function cadenceKey(seconds: number): VendorCadence {
+  return seconds === 86_400 ? "daily" : seconds === 604_800 ? "weekly" : "monthly";
+}
 
 function allowanceLabel(status: LiveVendor["allowance"]["status"]) {
   if (status === "available") return "Available";
@@ -85,6 +102,16 @@ function allowanceTime(value: string | null) {
   return new Date(value).toLocaleString(undefined, {
     month: "short",
     day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function activityTime(value: string) {
+  return new Date(value).toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
     hour: "numeric",
     minute: "2-digit",
   });
@@ -546,30 +573,46 @@ function TrustStrip({ data }: { data: SafeSpendBootstrap }) {
 
 function TreasuryLedger({ data }: { data: SafeSpendBootstrap }) {
   const decimals = data.treasury.tokenDecimals;
+  const metrics = calculateTreasuryMetrics(data);
   return (
     <section className="treasury-ledger" aria-label="Finalized treasury ledger">
       <div className="ledger-balance">
-        <span>Available treasury</span>
-        <strong>{decimal(data.treasury.tokenBalanceBaseUnits, decimals)}</strong>
-        <small>{data.treasury.tokenBalanceBaseUnits} base units · finalized</small>
+        <span>Finalized onchain balance</span>
+        <strong className="amount-value">
+          {decimal(data.treasury.tokenBalanceBaseUnits, decimals)} <em>tokens</em>
+        </strong>
+        <small title={data.treasury.tokenAccount}>
+          {short(data.treasury.tokenAccount, 8, 8)} · finalized on Devnet
+        </small>
       </div>
       <dl className="ledger-facts">
         <div>
-          <dt>Runway</dt>
-          <dd>{runway(data.treasury.runwayMilliweeks)} weeks</dd>
-          <small>{data.policy.minimumRunwayWeeks}.0 week floor</small>
+          <dt>Spendable above floor</dt>
+          <dd className="amount-value">
+            {decimal(metrics.spendableAboveFloor.toString(), decimals)} tokens
+          </dd>
+          <small>Current balance minus protected floor</small>
         </div>
         <div>
-          <dt>Weekly burn</dt>
-          <dd>{decimal(data.policy.weeklyBurnBaseUnits, decimals)} tokens</dd>
-          <small>Protected policy</small>
+          <dt>Protected floor</dt>
+          <dd className="amount-value">
+            {decimal(metrics.protectedFloor.toString(), decimals)} tokens
+          </dd>
+          <small>Higher of reserve or runway requirement</small>
         </div>
         <div>
           <dt>Fee reserve</dt>
-          <dd>{sol(data.treasury.solBalanceLamports)} SOL</dd>
+          <dd className="amount-value">{sol(data.treasury.solBalanceLamports)} SOL</dd>
           <small>Treasury account</small>
         </div>
       </dl>
+      <div className="ledger-rule">
+        <LockKeyhole size={15} aria-hidden="true" />
+        <span>
+          Vendor allowances are caps, not reserved balances. Only finalized transfers reduce this
+          balance; deleting a vendor does not refund prior payments.
+        </span>
+      </div>
     </section>
   );
 }
@@ -578,6 +621,7 @@ function RunwayPanel({ data }: { data: SafeSpendBootstrap }) {
   const weeks = Number(data.treasury.runwayMilliweeks) / 1000;
   const floor = data.policy.minimumRunwayWeeks;
   const max = Math.max(16, weeks * 1.25);
+  const metrics = calculateTreasuryMetrics(data);
   return (
     <section className="panel runway-panel">
       <div className="panel-heading">
@@ -591,7 +635,7 @@ function RunwayPanel({ data }: { data: SafeSpendBootstrap }) {
         </span>
       </div>
       <div className="runway-number">
-        <strong>{weeks.toFixed(1)}</strong>
+        <strong className="amount-value">{weeks.toFixed(1)}</strong>
         <span>weeks remaining</span>
       </div>
       <div className="runway-scale">
@@ -615,15 +659,22 @@ function RunwayPanel({ data }: { data: SafeSpendBootstrap }) {
         </div>
         <div>
           <dt>Weekly burn</dt>
-          <dd>{decimal(data.policy.weeklyBurnBaseUnits, data.treasury.tokenDecimals)} tokens</dd>
+          <dd className="amount-value">
+            {decimal(data.policy.weeklyBurnBaseUnits, data.treasury.tokenDecimals)} tokens
+          </dd>
         </div>
         <div>
-          <dt>Token reserve</dt>
-          <dd>
-            {decimal(data.policy.minimumTokenReserveBaseUnits, data.treasury.tokenDecimals)} tokens
+          <dt>Vendor caps / week</dt>
+          <dd className="amount-value">
+            {decimal(metrics.normalizedWeeklyAllowance.toString(), data.treasury.tokenDecimals)}{" "}
+            tokens
           </dd>
         </div>
       </dl>
+      <p className="calculation-note">
+        Runway = finalized balance ÷ protected weekly burn. Vendor caps are normalized to seven days
+        for planning and do not replace the founder-controlled burn baseline.
+      </p>
     </section>
   );
 }
@@ -671,7 +722,9 @@ function PaymentFlow({
   );
   const [trackedPaymentId, setTrackedPaymentId] = useState<string | null>(null);
   const [vendorId, setVendorId] = useState(
-    data.vendors.find((vendor) => vendor.allowance.status === "available")?.id ??
+    data.vendors.find(
+      (vendor) => vendor.enrollmentStatus === "active" && vendor.allowance.status === "available",
+    )?.id ??
       data.vendors[0]?.id ??
       "",
   );
@@ -690,39 +743,44 @@ function PaymentFlow({
   const runwayPasses =
     projectedBalance >= BigInt(data.policy.minimumTokenReserveBaseUnits) &&
     projectedMilliweeks >= BigInt(data.policy.minimumRunwayWeeks * 1000);
-  const allowancePasses = vendor?.allowance.status === "available";
+  const allowancePasses =
+    vendor?.enrollmentStatus === "active" && vendor.allowance.status === "available";
   const paymentPasses = runwayPasses && allowancePasses;
   const nextAvailable = allowanceTime(vendor?.allowance.nextAvailableAt ?? null);
   const previewTitle = !vendor
     ? "No protected vendor selected"
-    : vendor.allowance.status === "spent"
-      ? `${vendor.name} was already paid this period`
-      : vendor.allowance.status === "not_started"
-        ? `${vendor.name} allowance has not started`
-        : vendor.allowance.status === "expired"
-          ? `${vendor.name} allowance has expired`
-          : vendor.allowance.status === "expiring"
-            ? `${vendor.name} allowance expires too soon`
-            : vendor.allowance.status === "invalid"
-              ? `${vendor.name} onchain allowance is unavailable`
-              : !runwayPasses
-                ? "Protected runway would be breached"
-                : "Allowance, recipient, reserve, and runway pass";
+    : vendor.enrollmentStatus !== "active"
+      ? `${vendor.name} needs founder-signed enrollment`
+      : vendor.allowance.status === "spent"
+        ? `${vendor.name} was already paid this period`
+        : vendor.allowance.status === "not_started"
+          ? `${vendor.name} allowance has not started`
+          : vendor.allowance.status === "expired"
+            ? `${vendor.name} allowance has expired`
+            : vendor.allowance.status === "expiring"
+              ? `${vendor.name} allowance expires too soon`
+              : vendor.allowance.status === "invalid"
+                ? `${vendor.name} onchain allowance is unavailable`
+                : !runwayPasses
+                  ? "Protected runway would be breached"
+                  : "Allowance, recipient, reserve, and runway pass";
   const previewDetail = !vendor
     ? "Select a protected vendor."
-    : vendor.allowance.status === "spent"
-      ? `${decimal(vendor.allowance.amountPulledThisPeriodBaseUnits, data.treasury.tokenDecimals)} tokens used.${nextAvailable ? ` Next period: ${nextAvailable}.` : " No later period is available."}`
-      : vendor.allowance.status === "not_started"
-        ? `Starts ${allowanceTime(vendor.allowance.periodStartAt) ?? "after the current finalized slot"}.`
-        : vendor.allowance.status === "expired"
-          ? "Create a new founder-authorized delegation before requesting payment."
-          : vendor.allowance.status === "expiring"
-            ? "The expiry is inside the protected safety window. Replace the delegation offline."
-            : vendor.allowance.status === "invalid"
-              ? "The finalized delegation is missing or does not match the protected amount and cadence."
-              : runwayPasses
-                ? `Projected runway: ${(Number(projectedMilliweeks) / 1000).toFixed(1)} weeks.`
-                : `This payment projects ${(Number(projectedMilliweeks) / 1000).toFixed(1)} weeks, below the ${data.policy.minimumRunwayWeeks}.0 week floor.`;
+    : vendor.enrollmentStatus !== "active"
+      ? "Open Vendors and activate a signed policy version before requesting payment."
+      : vendor.allowance.status === "spent"
+        ? `${decimal(vendor.allowance.amountPulledThisPeriodBaseUnits, data.treasury.tokenDecimals)} tokens used.${nextAvailable ? ` Next period: ${nextAvailable}.` : " No later period is available."}`
+        : vendor.allowance.status === "not_started"
+          ? `Starts ${allowanceTime(vendor.allowance.periodStartAt) ?? "after the current finalized slot"}.`
+          : vendor.allowance.status === "expired"
+            ? "Create a new founder-authorized delegation before requesting payment."
+            : vendor.allowance.status === "expiring"
+              ? "The expiry is inside the protected safety window. Replace the delegation offline."
+              : vendor.allowance.status === "invalid"
+                ? "The finalized delegation is missing or does not match the protected amount and cadence."
+                : runwayPasses
+                  ? `Projected runway: ${(Number(projectedMilliweeks) / 1000).toFixed(1)} weeks.`
+                  : `This payment projects ${(Number(projectedMilliweeks) / 1000).toFixed(1)} weeks, below the ${data.policy.minimumRunwayWeeks}.0 week floor.`;
   async function mutate(url: string, body: unknown, success: string) {
     setBusy(true);
     setError("");
@@ -819,6 +877,7 @@ function PaymentFlow({
                 {data.vendors.map((v) => (
                   <option key={v.id} value={v.id}>
                     {v.name} · {v.category}
+                    {v.enrollmentStatus !== "active" ? " · needs signed policy" : ""}
                     {v.allowance.status === "spent" ? " · paid this period" : ""}
                   </option>
                 ))}
@@ -1142,8 +1201,47 @@ function BoundaryPanel({ data }: { data: SafeSpendBootstrap }) {
   );
 }
 
+type BrowserSolanaProvider = {
+  publicKey?: { toBase58(): string } | null;
+  connect(): Promise<{ publicKey: { toBase58(): string } }>;
+  on?(event: "accountChanged", handler: (publicKey: { toBase58(): string } | null) => void): void;
+  off?(event: "accountChanged", handler: (publicKey: { toBase58(): string } | null) => void): void;
+  signMessage?(
+    message: Uint8Array,
+    encoding?: "utf8",
+  ): Promise<{ signature: Uint8Array } | Uint8Array>;
+  signTransaction?(transaction: Transaction): Promise<Transaction>;
+};
+
+function browserSolanaProvider() {
+  const browser = window as Window & {
+    solana?: BrowserSolanaProvider;
+    phantom?: { solana?: BrowserSolanaProvider };
+  };
+  return browser.phantom?.solana ?? browser.solana;
+}
+
+function founderWalletMismatch(connected: string, expected: string) {
+  return `Connected wallet ${connected} is not the founder authority. In Phantom, switch to the imported account ${expected}, then connect again.`;
+}
+
+function bytesFromBase64(value: string) {
+  const binary = window.atob(value);
+  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+}
+
+function bytesToBase64(value: Uint8Array) {
+  let binary = "";
+  for (const byte of value) binary += String.fromCharCode(byte);
+  return window.btoa(binary);
+}
+
 function Vendors({ data, setToast }: { data: SafeSpendBootstrap; setToast: (s: string) => void }) {
   const [query, setQuery] = useState("");
+  const [mutation, setMutation] = useState<{
+    action: VendorPolicyAction;
+    vendor?: LiveVendor;
+  } | null>(null);
   const filtered = data.vendors.filter((v) =>
     `${v.name} ${v.category}`.toLowerCase().includes(query.toLowerCase()),
   );
@@ -1156,7 +1254,12 @@ function Vendors({ data, setToast }: { data: SafeSpendBootstrap; setToast: (s: s
       <PageHeader
         eyebrow="Protected recipients"
         title="Vendor allowances"
-        description="Read-only values loaded from the active protected Devnet configuration."
+        description="Founder-signed policy versions matched to finalized finite Devnet delegations."
+        actions={
+          <button className="button primary" onClick={() => setMutation({ action: "add" })}>
+            <Plus size={16} /> Add vendor
+          </button>
+        }
       />
       <div className="toolbar-row">
         <label className="table-search">
@@ -1179,6 +1282,9 @@ function Vendors({ data, setToast }: { data: SafeSpendBootstrap; setToast: (s: s
                 <th>Allowance</th>
                 <th>Cadence</th>
                 <th>Status</th>
+                <th>
+                  <span className="sr-only">Actions</span>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -1191,7 +1297,9 @@ function Vendors({ data, setToast }: { data: SafeSpendBootstrap; setToast: (s: s
                       </div>
                       <div>
                         <strong>{v.name}</strong>
-                        <span>{v.category}</span>
+                        <span>
+                          {v.category} · {v.policyVersion ? `Policy v${v.policyVersion}` : "Legacy"}
+                        </span>
                       </div>
                     </div>
                   </td>
@@ -1205,40 +1313,748 @@ function Vendors({ data, setToast }: { data: SafeSpendBootstrap; setToast: (s: s
                     </button>
                   </td>
                   <td>
-                    <strong>
+                    <strong className="amount-value">
                       {decimal(v.amountBaseUnits, data.treasury.tokenDecimals)} tokens
                     </strong>
-                    <span className="base-units">{v.amountBaseUnits} base units</span>
+                    <span className="base-units">
+                      {decimal(
+                        v.allowance.amountPulledThisPeriodBaseUnits,
+                        data.treasury.tokenDecimals,
+                      )}{" "}
+                      used ·{" "}
+                      {decimal(
+                        v.allowance.remainingThisPeriodBaseUnits,
+                        data.treasury.tokenDecimals,
+                      )}{" "}
+                      remaining
+                    </span>
                   </td>
                   <td>{cadence(v.periodSeconds)}</td>
                   <td>
                     <span
                       className={
-                        v.allowance.status === "available" ? "healthy-badge" : "warning-badge"
+                        v.enrollmentStatus === "active" && v.allowance.status === "available"
+                          ? "healthy-badge"
+                          : "warning-badge"
                       }
                     >
-                      {v.allowance.status === "available" && (
+                      {v.enrollmentStatus === "active" && v.allowance.status === "available" && (
                         <span className="status-dot healthy" />
                       )}
-                      {allowanceLabel(v.allowance.status)}
+                      {v.enrollmentStatus === "active"
+                        ? allowanceLabel(v.allowance.status)
+                        : "Needs signed policy"}
                     </span>
+                  </td>
+                  <td>
+                    <div className="vendor-actions">
+                      <button
+                        className="icon-button compact"
+                        onClick={() => setMutation({ action: "update", vendor: v })}
+                        disabled={v.enrollmentStatus !== "active"}
+                        aria-label={`Edit ${v.name}`}
+                        title={`Edit ${v.name}`}
+                      >
+                        <Pencil size={15} aria-hidden="true" />
+                      </button>
+                      <button
+                        className="icon-button compact danger"
+                        onClick={() => setMutation({ action: "delete", vendor: v })}
+                        disabled={v.enrollmentStatus !== "active"}
+                        aria-label={`Delete ${v.name}`}
+                        title={`Delete ${v.name}`}
+                      >
+                        <Trash2 size={15} aria-hidden="true" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+        {!filtered.length && (
+          <div className="table-empty">
+            <Building2 size={24} aria-hidden="true" />
+            <strong>No matching vendors</strong>
+            <span>Clear the search or enroll a new protected recipient.</span>
+          </div>
+        )}
       </section>
       <div className="configuration-note">
-        <LockKeyhole size={17} />
+        <BadgeCheck size={17} />
         <div>
-          <strong>Offline configuration only</strong>
+          <strong>Signed, versioned enrollment</strong>
           <span>
-            Change vendors in protected ZeroClaw config, then restart the daemon. The dashboard
-            cannot rewrite payment policy.
+            New vendors stay unavailable until the founder signs the policy and finite delegation,
+            the transaction finalizes, and the service verifies exact onchain terms.
           </span>
         </div>
       </div>
+      {mutation && (
+        <VendorEnrollmentDialog
+          data={data}
+          action={mutation.action}
+          vendor={mutation.vendor}
+          onClose={() => setMutation(null)}
+          onActivated={() => {
+            setToast(
+              mutation.action === "delete"
+                ? "Vendor deleted and delegation revoked"
+                : mutation.action === "update"
+                  ? "Vendor terms updated"
+                  : "Vendor policy activated",
+            );
+            window.location.reload();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function VendorEnrollmentDialog({
+  data,
+  action,
+  vendor,
+  onClose,
+  onActivated,
+}: {
+  data: SafeSpendBootstrap;
+  action: VendorPolicyAction;
+  vendor?: LiveVendor;
+  onClose: () => void;
+  onActivated: () => void;
+}) {
+  const [displayName, setDisplayName] = useState(vendor?.name ?? "");
+  const [recipientWallet, setRecipientWallet] = useState(vendor?.recipientWallet ?? "");
+  const [amountTokens, setAmountTokens] = useState(
+    vendor
+      ? decimal(vendor.amountBaseUnits, data.treasury.tokenDecimals, data.treasury.tokenDecimals)
+      : "",
+  );
+  const [cadenceValue, setCadenceValue] = useState<VendorCadence>(
+    vendor ? cadenceKey(vendor.periodSeconds) : "monthly",
+  );
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const [founderWallet, setFounderWallet] = useState("");
+  const [proposal, setProposal] = useState<VendorEnrollmentProposal | null>(null);
+  const [result, setResult] = useState<VendorEnrollmentResult | null>(null);
+  const [stage, setStage] = useState<"form" | "preparing" | "review" | "signing" | "finalizing">(
+    "form",
+  );
+  const [error, setError] = useState("");
+  const dialog = useRef<HTMLElement>(null);
+  const closeButton = useRef<HTMLButtonElement>(null);
+  const busy = ["preparing", "signing", "finalizing"].includes(stage);
+  const vendorHistory = vendor
+    ? calculateVendorHistory(data.payments, vendor)
+    : { finalizedCount: 0, finalizedOutflow: 0n, openRequestCount: 0 };
+
+  useEffect(() => {
+    closeButton.current?.focus();
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !busy) onClose();
+      if (event.key !== "Tab") return;
+      const focusable = Array.from(
+        dialog.current?.querySelectorAll<HTMLElement>(
+          "button:not([disabled]), input:not([disabled]), select:not([disabled]), a[href]",
+        ) ?? [],
+      );
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (!first || !last) return;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    window.addEventListener("keydown", escape);
+    return () => window.removeEventListener("keydown", escape);
+  }, [busy, onClose]);
+
+  useEffect(() => {
+    const provider = browserSolanaProvider();
+    if (!provider?.on) return;
+    const accountChanged = (publicKey: { toBase58(): string } | null) => {
+      setProposal(null);
+      setResult(null);
+      setStage("form");
+      if (!publicKey) {
+        setFounderWallet("");
+        setError("Wallet disconnected. Connect the protected founder account to continue.");
+        return;
+      }
+      const address = publicKey.toBase58();
+      if (address !== data.treasury.owner) {
+        setFounderWallet("");
+        setError(founderWalletMismatch(address, data.treasury.owner));
+        return;
+      }
+      setFounderWallet(address);
+      setError("");
+    };
+    provider.on("accountChanged", accountChanged);
+    return () => provider.off?.("accountChanged", accountChanged);
+  }, [data.treasury.owner]);
+
+  async function connectWallet() {
+    const provider = browserSolanaProvider();
+    if (!provider) {
+      throw new Error("Install or unlock a Solana wallet that supports message signing.");
+    }
+    const connected = provider.publicKey ?? (await provider.connect()).publicKey;
+    const address = connected.toBase58();
+    if (address !== data.treasury.owner) {
+      setFounderWallet("");
+      throw new Error(founderWalletMismatch(address, data.treasury.owner));
+    }
+    setFounderWallet(address);
+    return { provider, address };
+  }
+
+  async function prepare(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setStage("preparing");
+    setError("");
+    try {
+      if (action === "delete" && deleteConfirmation !== vendor?.id) {
+        throw new Error(`Type ${vendor?.id ?? "the vendor ID"} exactly to confirm deletion.`);
+      }
+      const wallet = founderWallet || (await connectWallet()).address;
+      const endpoint =
+        action === "update"
+          ? "/api/safespend/vendors/update/preview"
+          : action === "delete"
+            ? "/api/safespend/vendors/delete/preview"
+            : "/api/safespend/vendors/preview";
+      const body =
+        action === "delete"
+          ? { vendorId: vendor?.id, founderWallet: wallet }
+          : {
+              ...(action === "update" ? { vendorId: vendor?.id } : {}),
+              displayName,
+              recipientWallet,
+              amountTokens,
+              cadence: cadenceValue,
+              founderWallet: wallet,
+            };
+      const prepared = await jsonRequest<VendorEnrollmentProposal>(endpoint, {
+        method: "POST",
+        body: JSON.stringify(body),
+      });
+      setProposal(prepared);
+      setStage("review");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Vendor review could not be prepared.");
+      setStage("form");
+    }
+  }
+
+  async function signAndActivate() {
+    if (!proposal) return;
+    setStage("signing");
+    setError("");
+    try {
+      const { provider, address } = await connectWallet();
+      if (address !== proposal.review.founderWallet) {
+        throw new Error(
+          "Connected wallet changed. Reopen this policy change with the founder wallet.",
+        );
+      }
+      if (!provider.signMessage || !provider.signTransaction) {
+        throw new Error("Connected wallet does not support policy and transaction signing.");
+      }
+      const messageResult = await provider.signMessage(
+        new TextEncoder().encode(proposal.signingMessage),
+        "utf8",
+      );
+      const policySignature =
+        messageResult instanceof Uint8Array ? messageResult : messageResult.signature;
+      const transaction = Transaction.from(bytesFromBase64(proposal.unsignedTransactionBase64));
+      const signedTransaction = await provider.signTransaction(transaction);
+      const payload = {
+        proposalId: proposal.proposalId,
+        policySignatureBase64: bytesToBase64(policySignature),
+        signedTransactionBase64: bytesToBase64(
+          signedTransaction.serialize({ requireAllSignatures: true, verifySignatures: true }),
+        ),
+      };
+      setStage("finalizing");
+      for (let attempt = 0; attempt < 45; attempt += 1) {
+        const activation = await jsonRequest<VendorEnrollmentResult>(
+          "/api/safespend/vendors/activate",
+          { method: "POST", body: JSON.stringify(payload) },
+        );
+        setResult(activation);
+        if (activation.status === "active") return;
+        await new Promise((resolve) => window.setTimeout(resolve, 2_000));
+      }
+      throw new Error(
+        "Policy transaction is still not finalized. Keep this window open and retry.",
+      );
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : "Vendor policy change failed.";
+      setError(
+        /reject|cancel/i.test(message)
+          ? "Wallet signing was cancelled. No policy or delegation change was activated."
+          : message,
+      );
+      setStage(proposal ? "review" : "form");
+    }
+  }
+
+  const review = proposal?.review;
+  const projectedWeeks = review ? Number(review.projectedRunwayMilliweeks) / 1000 : 0;
+  return (
+    <div className="dialog-backdrop" role="presentation">
+      <section
+        ref={dialog}
+        className="enrollment-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="vendor-enrollment-title"
+        aria-busy={busy}
+      >
+        <div className="dialog-heading">
+          <div>
+            <span className="section-kicker">Policy administration</span>
+            <h2 id="vendor-enrollment-title">
+              {result?.status === "active"
+                ? action === "delete"
+                  ? "Vendor deleted"
+                  : action === "update"
+                    ? "Vendor updated"
+                    : "Vendor active"
+                : action === "delete"
+                  ? "Delete vendor"
+                  : action === "update"
+                    ? "Edit vendor"
+                    : "Add vendor"}
+            </h2>
+          </div>
+          <button
+            ref={closeButton}
+            className="icon-button"
+            onClick={onClose}
+            disabled={busy}
+            aria-label="Close vendor policy dialog"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {error && (
+          <div className="runtime-error" role="alert">
+            <XCircle size={17} aria-hidden="true" />
+            <div>
+              <strong>Change refused</strong>
+              <span>{error}</span>
+            </div>
+          </div>
+        )}
+
+        {result?.status === "active" ? (
+          <div className="enrollment-success">
+            <div className="state-icon success">
+              <BadgeCheck size={24} aria-hidden="true" />
+            </div>
+            <h3>
+              {action === "delete"
+                ? `${review?.displayName} was removed`
+                : review?.replacementStartsAfterPriorPeriod
+                  ? `${review.displayName} update is scheduled`
+                  : `${review?.displayName} is eligible for payments`}
+            </h3>
+            <p>
+              {action === "delete"
+                ? `Policy v${result.policyVersion} is active and the former delegation is closed. New payments are ineligible. ${vendorHistory.finalizedCount} prior finalized payment${vendorHistory.finalizedCount === 1 ? "" : "s"} remain in the immutable activity ledger; no tokens were refunded.`
+                : review?.replacementStartsAfterPriorPeriod
+                  ? `Policy v${result.policyVersion} is active. The prior payment remains consumed, so the new allowance starts ${new Date(review.startAt).toLocaleString()}.`
+                  : `Policy v${result.policyVersion} and the exact recurring delegation are finalized and verified. Every payment still requires the SOP checkpoint and Telegram approval.`}
+            </p>
+            <dl className="review-grid">
+              <div>
+                <dt>Policy hash</dt>
+                <dd>
+                  <code>{short(result.policyHash, 12, 10)}</code>
+                </dd>
+              </div>
+              <div>
+                <dt>Policy transaction</dt>
+                <dd>
+                  <code>{short(result.signature, 12, 10)}</code>
+                </dd>
+              </div>
+            </dl>
+            <button className="button primary full-width" onClick={onActivated}>
+              {action === "delete" ? "Return to vendors" : "Use vendor for payments"}
+            </button>
+          </div>
+        ) : stage === "form" || stage === "preparing" ? (
+          <form className="vendor-form" onSubmit={(event) => void prepare(event)}>
+            <div className="custody-callout">
+              <WalletCards size={18} aria-hidden="true" />
+              <div>
+                <strong>Founder wallet signs locally</strong>
+                <span>
+                  SafeSpend receives signed public bytes, never your key or recovery phrase.
+                </span>
+              </div>
+            </div>
+            {action === "delete" ? (
+              <div className="delete-confirmation">
+                <Trash2 size={19} aria-hidden="true" />
+                <div>
+                  <strong>Revoke {vendor?.name}</strong>
+                  <p>
+                    This closes delegation <code>{short(vendor?.recurringDelegation ?? "")}</code>,
+                    removes the vendor from policy v{data.policy.vendorPolicyVersion + 1}, and makes
+                    future payments ineligible. It does not send or refund tokens.
+                  </p>
+                  <dl className="delete-impact">
+                    <div>
+                      <dt>Already finalized</dt>
+                      <dd className="amount-value">
+                        {decimal(
+                          vendorHistory.finalizedOutflow.toString(),
+                          data.treasury.tokenDecimals,
+                        )}{" "}
+                        tokens · {vendorHistory.finalizedCount} payment
+                        {vendorHistory.finalizedCount === 1 ? "" : "s"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Open requests</dt>
+                      <dd>{vendorHistory.openRequestCount}</dd>
+                    </div>
+                  </dl>
+                  <p className="delete-boundary">
+                    Requests not yet submitted will be refused after the policy changes. A transfer
+                    already submitted before revocation may still finalize first and will remain in
+                    Activity.
+                  </p>
+                  <label htmlFor="delete-vendor-confirmation">
+                    <span>
+                      Type <code>{vendor?.id}</code> to confirm
+                    </span>
+                    <input
+                      id="delete-vendor-confirmation"
+                      type="text"
+                      autoComplete="off"
+                      spellCheck={false}
+                      value={deleteConfirmation}
+                      onChange={(event) => setDeleteConfirmation(event.target.value)}
+                      required
+                    />
+                  </label>
+                </div>
+              </div>
+            ) : (
+              <>
+                <label htmlFor="vendor-name">
+                  <span>Vendor name</span>
+                  <input
+                    id="vendor-name"
+                    type="text"
+                    autoComplete="organization"
+                    value={displayName}
+                    onChange={(event) => setDisplayName(event.target.value)}
+                    placeholder="Railway"
+                    required
+                    maxLength={80}
+                  />
+                  <small>
+                    {action === "update"
+                      ? `Vendor ID remains ${vendor?.id}.`
+                      : "A stable vendor ID is derived from this name."}
+                  </small>
+                </label>
+                <label htmlFor="recipient-wallet">
+                  <span>Recipient wallet</span>
+                  <input
+                    id="recipient-wallet"
+                    type="text"
+                    autoComplete="off"
+                    spellCheck={false}
+                    value={recipientWallet}
+                    onChange={(event) => setRecipientWallet(event.target.value.trim())}
+                    placeholder="Solana public key"
+                    required
+                    minLength={32}
+                    maxLength={64}
+                  />
+                  <small>
+                    If needed, the founder-signed transaction creates the canonical-mint token
+                    account.
+                  </small>
+                </label>
+                <div className="field-row">
+                  <label htmlFor="vendor-amount">
+                    <span>Amount per period</span>
+                    <input
+                      id="vendor-amount"
+                      type="text"
+                      inputMode="decimal"
+                      autoComplete="off"
+                      spellCheck={false}
+                      value={amountTokens}
+                      onChange={(event) => setAmountTokens(event.target.value)}
+                      placeholder="12.00"
+                      required
+                    />
+                    <small>Token units · {data.treasury.tokenDecimals} mint decimals</small>
+                  </label>
+                  <label htmlFor="vendor-cadence">
+                    <span>Cadence</span>
+                    <select
+                      id="vendor-cadence"
+                      value={cadenceValue}
+                      onChange={(event) => setCadenceValue(event.target.value as VendorCadence)}
+                    >
+                      <option value="daily">Daily · 86,400 seconds</option>
+                      <option value="weekly">Weekly · 604,800 seconds</option>
+                      <option value="monthly">Monthly · 2,592,000 seconds</option>
+                    </select>
+                    <small>Monthly is a fixed 30-day period.</small>
+                  </label>
+                </div>
+              </>
+            )}
+            <div className="wallet-row">
+              <div>
+                <span>Signing authority</span>
+                <code title={founderWallet || data.treasury.owner}>
+                  {founderWallet ? short(founderWallet) : short(data.treasury.owner)}
+                </code>
+                <small>{founderWallet ? "Founder connected" : "Required founder account"}</small>
+              </div>
+              {founderWallet ? (
+                <div className="wallet-portfolio" aria-label="Founder treasury portfolio">
+                  <div>
+                    <span>Native balance</span>
+                    <strong>{sol(data.treasury.solBalanceLamports)} SOL</strong>
+                  </div>
+                  <div>
+                    <span>Treasury token</span>
+                    <strong>
+                      {decimal(data.treasury.tokenBalanceBaseUnits, data.treasury.tokenDecimals)}
+                    </strong>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="button secondary"
+                  onClick={() =>
+                    void connectWallet().catch((caught) =>
+                      setError(caught instanceof Error ? caught.message : "Wallet unavailable."),
+                    )
+                  }
+                >
+                  <WalletCards size={16} /> Connect Phantom
+                </button>
+              )}
+            </div>
+            <button
+              className={`button ${action === "delete" ? "danger" : "primary"} full-width`}
+              type="submit"
+              disabled={busy || (action === "delete" && deleteConfirmation !== vendor?.id)}
+            >
+              {stage === "preparing" ? (
+                <LoaderCircle size={16} className="spin" />
+              ) : (
+                <ShieldCheck size={16} />
+              )}
+              {stage === "preparing"
+                ? "Validating finalized state…"
+                : action === "delete"
+                  ? "Review deletion"
+                  : action === "update"
+                    ? "Review update"
+                    : "Review delegation"}
+            </button>
+          </form>
+        ) : (
+          review && (
+            <div className="vendor-review">
+              <div className="review-status passes" role="status">
+                {stage === "finalizing" ? (
+                  <LoaderCircle size={19} className="spin" aria-hidden="true" />
+                ) : (
+                  <ShieldCheck size={19} aria-hidden="true" />
+                )}
+                <div>
+                  <strong>
+                    {stage === "finalizing"
+                      ? "Waiting for finalized policy transaction"
+                      : review.replacementStartsAfterPriorPeriod
+                        ? "Current-period payment is preserved"
+                        : action === "delete"
+                          ? "Exact revocation and policy checks pass"
+                          : "Exact policy and runway checks pass"}
+                  </strong>
+                  <span>
+                    {stage === "finalizing"
+                      ? `Submitted ${short(result?.signature ?? "", 10, 8)}. The current policy remains authoritative until finalization.`
+                      : review.replacementStartsAfterPriorPeriod
+                        ? `${decimal(review.priorAmountPulledBaseUnits, data.treasury.tokenDecimals)} tokens already paid remain consumed. The new allowance begins ${new Date(review.startAt).toLocaleString()}.`
+                        : action === "delete"
+                          ? `Policy v${review.policyVersion} removes this vendor only after the delegation is finalized closed.`
+                          : `First payment leaves ${projectedWeeks.toFixed(1)} weeks, above the ${review.minimumRunwayWeeks}.0 week floor.`}
+                  </span>
+                </div>
+              </div>
+              <dl className="review-grid">
+                <div>
+                  <dt>Vendor</dt>
+                  <dd>{review.displayName}</dd>
+                  <small>{review.vendorId}</small>
+                </div>
+                <div>
+                  <dt>Fixed allowance</dt>
+                  <dd>{review.amountTokens} tokens</dd>
+                  <small>
+                    {review.replacementStartsAfterPriorPeriod
+                      ? `Next period · prior ${decimal(review.priorAmountPulledBaseUnits, data.treasury.tokenDecimals)} paid`
+                      : `${review.amountBaseUnits} base units`}
+                  </small>
+                </div>
+                <div>
+                  <dt>Cadence</dt>
+                  <dd>{cadence(review.periodSeconds)}</dd>
+                  <small>{review.periodSeconds.toLocaleString()} seconds</small>
+                </div>
+                <div>
+                  <dt>Finite term</dt>
+                  <dd>
+                    {new Date(review.startAt).toLocaleDateString()} →{" "}
+                    {new Date(review.expiryAt).toLocaleDateString()}
+                  </dd>
+                  <small>Starts {new Date(review.startAt).toLocaleString()}</small>
+                </div>
+                <div>
+                  <dt>Recipient wallet</dt>
+                  <dd>
+                    <code title={review.recipientWallet}>{short(review.recipientWallet)}</code>
+                  </dd>
+                  <small>
+                    ATA {short(review.recipientTokenAccount)} ·{" "}
+                    {review.recipientTokenAccountWillBeCreated
+                      ? "created during enrollment"
+                      : "already initialized"}
+                  </small>
+                </div>
+                <div>
+                  <dt>{action === "delete" ? "Current runway" : "Runway after first payment"}</dt>
+                  <dd>{projectedWeeks.toFixed(1)} weeks</dd>
+                  <small>
+                    {decimal(review.projectedBalanceBaseUnits, data.treasury.tokenDecimals)} tokens
+                  </small>
+                </div>
+                <div>
+                  <dt>
+                    {action === "delete"
+                      ? "Delegation to revoke"
+                      : action === "update"
+                        ? review.revokedDelegation
+                          ? "Delegation replacement"
+                          : "Delegation retained"
+                        : "Delegation PDA"}
+                  </dt>
+                  <dd>
+                    <code
+                      title={
+                        action === "delete"
+                          ? (review.revokedDelegation ?? undefined)
+                          : (review.recurringDelegation ?? undefined)
+                      }
+                    >
+                      {action === "update" && review.revokedDelegation
+                        ? `${short(review.revokedDelegation ?? "")} → ${short(review.recurringDelegation ?? "")}`
+                        : short(
+                            action === "delete"
+                              ? (review.revokedDelegation ?? "")
+                              : (review.recurringDelegation ?? ""),
+                          )}
+                    </code>
+                  </dd>
+                  <small>
+                    {action === "delete"
+                      ? "Closed atomically before policy publication"
+                      : action === "update" && !review.revokedDelegation
+                        ? "Name-only edit; allowance period is not reset"
+                        : `New nonce ${review.delegationNonce}`}
+                  </small>
+                </div>
+                {action === "delete" && (
+                  <div>
+                    <dt>Historical payments</dt>
+                    <dd className="amount-value">
+                      {decimal(
+                        vendorHistory.finalizedOutflow.toString(),
+                        data.treasury.tokenDecimals,
+                      )}{" "}
+                      tokens
+                    </dd>
+                    <small>
+                      {vendorHistory.finalizedCount} finalized · retained in Activity · no refund
+                    </small>
+                  </div>
+                )}
+                <div>
+                  <dt>Immutable policy</dt>
+                  <dd>Version {review.policyVersion}</dd>
+                  <small title={review.policyHash}>{short(review.policyHash, 10, 8)}</small>
+                </div>
+              </dl>
+              <div className="signature-explainer">
+                <Clock3 size={17} aria-hidden="true" />
+                <p>
+                  Your wallet will request two signatures: the immutable policy version, then the
+                  {action === "delete"
+                    ? " Subscriptions delegation revocation"
+                    : action === "update"
+                      ? review.revokedDelegation
+                        ? review.replacementStartsAfterPriorPeriod
+                          ? " atomic replacement and revocation transaction. The new delegation starts only after the paid current period ends"
+                          : " atomic replacement and revocation transaction. No current-period payment exists, so the new delegation starts immediately"
+                        : " policy anchor transaction; the existing delegation and allowance period stay unchanged"
+                      : " finite Subscriptions delegation"}
+                  . Neither signature sends a vendor payment. A wallet-added compute budget is
+                  accepted only under SafeSpend&apos;s capped Devnet fee limit.
+                </p>
+              </div>
+              <div className="approval-actions">
+                <button
+                  className="button secondary"
+                  onClick={() => setStage("form")}
+                  disabled={busy}
+                >
+                  Back
+                </button>
+                <button
+                  className={`button ${action === "delete" ? "danger" : "primary"}`}
+                  onClick={() => void signAndActivate()}
+                  disabled={busy}
+                >
+                  {busy ? <LoaderCircle size={16} className="spin" /> : <WalletCards size={16} />}
+                  {stage === "finalizing"
+                    ? "Finalizing on Devnet…"
+                    : action === "delete"
+                      ? "Sign and delete"
+                      : action === "update"
+                        ? "Sign and update"
+                        : "Sign and activate"}
+                </button>
+              </div>
+            </div>
+          )
+        )}
+      </section>
     </div>
   );
 }
@@ -1250,13 +2066,19 @@ function ActivityView({
   data: SafeSpendBootstrap;
   navigate: (v: View) => void;
 }) {
-  const items = data.payments;
+  const metrics = calculateTreasuryMetrics(data);
+  const transactions = data.payments.filter(
+    (payment) => Boolean(payment.signature) && ["submitted", "finalized"].includes(payment.status),
+  );
+  const requests = data.payments.filter(
+    (payment) => !transactions.some((transaction) => transaction.id === payment.id),
+  );
   return (
     <div className="page-stack">
       <PageHeader
         eyebrow="Auditable history"
         title="Activity"
-        description="Dashboard requests plus independently observed finalized treasury signatures."
+        description="Verified SafeSpend payments only. Funding, minting, and policy-admin transactions are excluded."
         actions={
           <a
             className="button secondary"
@@ -1268,10 +2090,37 @@ function ActivityView({
           </a>
         }
       />
+      <dl className="activity-summary" aria-label="SafeSpend activity totals">
+        <div>
+          <dt>Current finalized balance</dt>
+          <dd className="amount-value">
+            {decimal(metrics.balance.toString(), data.treasury.tokenDecimals)} tokens
+          </dd>
+        </div>
+        <div>
+          <dt>Recorded finalized outflow</dt>
+          <dd className="amount-value">
+            {decimal(metrics.finalizedOutflow.toString(), data.treasury.tokenDecimals)} tokens
+          </dd>
+          <small>{metrics.finalizedPaymentCount} verified vendor payments</small>
+        </div>
+        <div>
+          <dt>Submitted, not finalized</dt>
+          <dd className="amount-value">
+            {decimal(metrics.submittedOutflow.toString(), data.treasury.tokenDecimals)} tokens
+          </dd>
+          <small>{metrics.submittedPaymentCount} onchain transactions</small>
+        </div>
+        <div>
+          <dt>Open approval requests</dt>
+          <dd className="amount-value">{metrics.openRequestCount}</dd>
+          <small>Not deducted from treasury</small>
+        </div>
+      </dl>
       <section className="panel activity-panel">
-        {items.length ? (
+        {transactions.length ? (
           <div className="activity-list large">
-            {items.map((p) => (
+            {transactions.map((p) => (
               <div className="activity-row" key={p.id}>
                 <div className="timeline-node">
                   <ShieldCheck size={16} />
@@ -1298,7 +2147,7 @@ function ActivityView({
                     )}
                   </span>
                 </div>
-                <time>{new Date(p.updatedAt).toLocaleTimeString()}</time>
+                <time>{activityTime(p.updatedAt)}</time>
                 <span
                   className={`activity-status ${p.status === "finalized" ? "verified" : "observed"}`}
                 >
@@ -1310,41 +2159,41 @@ function ActivityView({
         ) : (
           <EmptyState
             icon={Send}
-            title="No dashboard payments yet"
-            description="Start a protected Devnet request to create the local audit ledger."
+            title="No verified payments"
+            description="Funding and policy transactions are intentionally not shown as vendor payments."
             action="Start payment"
             onAction={() => navigate("payments")}
           />
         )}
       </section>
-      <section className="panel compact-panel">
-        <div className="panel-heading">
-          <div>
-            <span className="section-kicker">Finalized RPC state</span>
-            <h2>Recent treasury signatures</h2>
+      {requests.length > 0 && (
+        <section className="panel compact-panel">
+          <div className="panel-heading">
+            <div>
+              <span className="section-kicker">Non-transaction events</span>
+              <h2>Request history</h2>
+            </div>
           </div>
-        </div>
-        <div className="activity-list">
-          {data.recentSignatures.map((s) => (
-            <a
-              className="activity-row"
-              key={s.signature}
-              href={`https://explorer.solana.com/tx/${s.signature}?cluster=devnet`}
-              target="_blank"
-              rel="noreferrer"
-            >
-              <div className="timeline-node">
-                <BadgeCheck size={16} />
+          <div className="activity-list large request-list">
+            {requests.map((payment) => (
+              <div className="activity-row" key={payment.id}>
+                <div className="timeline-node">
+                  <ShieldCheck size={16} />
+                </div>
+                <div>
+                  <strong>
+                    {payment.vendorId} ·{" "}
+                    {decimal(payment.amountBaseUnits, data.treasury.tokenDecimals)} tokens
+                  </strong>
+                  <span>{payment.error ?? "No finalized transfer was recorded."}</span>
+                </div>
+                <time>{activityTime(payment.updatedAt)}</time>
+                <span className="activity-status observed">{payment.status.replace("_", " ")}</span>
               </div>
-              <div>
-                <strong>{short(s.signature, 14, 12)}</strong>
-                <span>{s.err ? "Onchain error" : (s.confirmationStatus ?? "Observed")}</span>
-              </div>
-              <time>{s.blockTime ? new Date(s.blockTime * 1000).toLocaleDateString() : "—"}</time>
-            </a>
-          ))}
-        </div>
-      </section>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }
@@ -1537,6 +2386,7 @@ function SettingsView({
 }
 
 function RecentActivity({ data, onViewAll }: { data: SafeSpendBootstrap; onViewAll: () => void }) {
+  const payments = data.payments.filter(isFinalizedPayment);
   return (
     <section className="panel compact-panel">
       <div className="panel-heading">
@@ -1548,9 +2398,9 @@ function RecentActivity({ data, onViewAll }: { data: SafeSpendBootstrap; onViewA
           View all <ChevronRight size={14} />
         </button>
       </div>
-      {data.payments.length ? (
+      {payments.length ? (
         <div className="activity-list">
-          {data.payments.slice(0, 3).map((p) => (
+          {payments.slice(0, 3).map((p) => (
             <div className="activity-row" key={p.id}>
               <div className="timeline-node">
                 <ShieldCheck size={16} />
@@ -1559,17 +2409,20 @@ function RecentActivity({ data, onViewAll }: { data: SafeSpendBootstrap; onViewA
                 <strong>{p.vendorId} payment</strong>
                 <span>{short(p.runId, 12, 7)}</span>
               </div>
-              <time>{p.status}</time>
+              <time className="amount-value">
+                {decimal(p.amountBaseUnits, data.treasury.tokenDecimals)} tokens
+              </time>
             </div>
           ))}
         </div>
       ) : (
-        <p className="muted-copy">No dashboard payment requests yet.</p>
+        <p className="muted-copy">No finalized SafeSpend payments yet.</p>
       )}
     </section>
   );
 }
 function AllowancePanel({ data, onManage }: { data: SafeSpendBootstrap; onManage: () => void }) {
+  const metrics = calculateTreasuryMetrics(data);
   return (
     <section className="panel compact-panel">
       <div className="panel-heading">
@@ -1581,25 +2434,64 @@ function AllowancePanel({ data, onManage }: { data: SafeSpendBootstrap; onManage
           Review <ChevronRight size={14} />
         </button>
       </div>
-      <div className="allowance-list">
-        {data.vendors.map((v) => (
-          <div className="allowance-row" key={v.id}>
-            <div className="vendor-icon">
-              <Building2 size={17} />
+      <dl className="allowance-summary" aria-label="Active allowance totals">
+        <div>
+          <dt>Callable now</dt>
+          <dd className="amount-value">
+            {decimal(metrics.callableNow.toString(), data.treasury.tokenDecimals)} tokens
+          </dd>
+        </div>
+        <div>
+          <dt>Normalized weekly cap</dt>
+          <dd className="amount-value">
+            {decimal(metrics.normalizedWeeklyAllowance.toString(), data.treasury.tokenDecimals)}{" "}
+            tokens
+          </dd>
+        </div>
+      </dl>
+      {data.vendors.length ? (
+        <div className="allowance-list">
+          {data.vendors.map((v) => (
+            <div className="allowance-row" key={v.id}>
+              <div className="vendor-icon">
+                <Building2 size={17} aria-hidden="true" />
+              </div>
+              <div>
+                <strong>{v.name}</strong>
+                <span>
+                  {cadence(v.periodSeconds)} · policy v{v.policyVersion}
+                </span>
+              </div>
+              <div>
+                <strong className="amount-value">
+                  {decimal(v.allowance.remainingThisPeriodBaseUnits, data.treasury.tokenDecimals)}{" "}
+                  remaining
+                </strong>
+                <span>
+                  {decimal(
+                    v.allowance.amountPulledThisPeriodBaseUnits,
+                    data.treasury.tokenDecimals,
+                  )}{" "}
+                  used of {decimal(v.amountBaseUnits, data.treasury.tokenDecimals)} ·{" "}
+                  {allowanceLabel(v.allowance.status)}
+                </span>
+              </div>
             </div>
-            <div>
-              <strong>{v.name}</strong>
-              <span>
-                {v.category} · {cadence(v.periodSeconds)}
-              </span>
-            </div>
-            <div>
-              <strong>{decimal(v.amountBaseUnits, data.treasury.tokenDecimals)}</strong>
-              <span>{allowanceLabel(v.allowance.status)}</span>
-            </div>
-          </div>
-        ))}
+          ))}
+        </div>
+      ) : (
+        <p className="muted-copy">No active founder-signed vendor allowances.</p>
+      )}
+      <div className="allowance-total">
+        <span>Active signed policy</span>
+        <strong title={data.policy.vendorPolicyHash ?? undefined}>
+          v{data.policy.vendorPolicyVersion} · {short(data.policy.vendorPolicyHash ?? "", 6, 6)}
+        </strong>
       </div>
+      <p className="calculation-note">
+        These are maximum recurring permissions. SafeSpend does not earmark or subtract them from
+        the treasury until a payment finalizes.
+      </p>
     </section>
   );
 }

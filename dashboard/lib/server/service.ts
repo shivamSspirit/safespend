@@ -3,7 +3,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { LivePayment, PendingSopRun, SafeSpendBootstrap } from "@/lib/safespend-types";
-import { loadSafeSpendServerConfig } from "./config";
+import { loadSafeSpendServerConfig, loadSafeSpendServerConfigForPolicyVersion } from "./config";
 import { gatewayFetch, gatewayHealth, getGatewayToken } from "./gateway";
 import {
   validateAllowancePreflight,
@@ -128,8 +128,11 @@ async function reconcilePayments(
   storedRuns: ApprovedExpenseRun[],
   pendingRunIds: Set<string>,
 ) {
-  const config = await loadSafeSpendServerConfig();
   const storedByRunId = new Map(storedRuns.map((run) => [run.runId, run]));
+  const historicalConfigs = new Map<
+    number | undefined,
+    Awaited<ReturnType<typeof loadSafeSpendServerConfig>>
+  >();
   const next: LivePayment[] = [];
   for (const payment of discoveredPayments(current, storedRuns)) {
     const patch: Partial<LivePayment> = {};
@@ -145,6 +148,11 @@ async function reconcilePayments(
       if (!stored.signature) patch.confirmationStatus = undefined;
     }
     if (signature) {
+      let verificationConfig = historicalConfigs.get(payment.policyVersion);
+      if (!verificationConfig) {
+        verificationConfig = await loadSafeSpendServerConfigForPolicyVersion(payment.policyVersion);
+        historicalConfigs.set(payment.policyVersion, verificationConfig);
+      }
       const alreadyVerified =
         verifiedSignatures.has(signature) &&
         payment.signature === signature &&
@@ -153,7 +161,7 @@ async function reconcilePayments(
       const verification = alreadyVerified
         ? { valid: true as const, confirmationStatus: "finalized" as const }
         : await verifyPaymentSignature(
-            config,
+            verificationConfig,
             payment.vendorId,
             BigInt(payment.amountBaseUnits),
             signature,
@@ -165,6 +173,7 @@ async function reconcilePayments(
         patch.status = "failed";
         patch.error = "The submitted signature does not match the protected Devnet transfer.";
       } else {
+        patch.error = undefined;
         patch.confirmationStatus = verification.confirmationStatus;
         patch.status =
           verification.valid === true && verification.confirmationStatus === "finalized"
@@ -266,6 +275,8 @@ async function buildBootstrapFresh(): Promise<SafeSpendBootstrap> {
       minimumSessionFeeReserveLamports: config.minimumSessionFeeReserveLamports.toString(),
       allowMainnet: false,
       toolApprovalRoute: "telegram.guardian",
+      vendorPolicyVersion: config.vendorPolicyVersion,
+      vendorPolicyHash: config.vendorPolicyHash,
     },
     vendors: config.vendors.map((vendor) => ({
       ...vendor,
@@ -303,7 +314,7 @@ export async function buildBootstrap(): Promise<SafeSpendBootstrap> {
   return inFlight;
 }
 
-function invalidateBootstrap() {
+export function invalidateBootstrap() {
   bootstrapEpoch += 1;
   cachedBootstrap = undefined;
   bootstrapInFlight = undefined;
@@ -339,6 +350,8 @@ export async function createPayment(value: unknown) {
     updatedAt: now,
     status: "validating",
     source: "dashboard",
+    policyVersion: config.vendorPolicyVersion,
+    policyHash: config.vendorPolicyHash ?? undefined,
   };
   await mutatePayments((current) => [
     payment,
@@ -352,6 +365,17 @@ export async function decidePayment(runId: string, decision: "approve" | "deny")
   invalidateBootstrap();
   const payment = (await readPayments()).find((candidate) => candidate.runId === runId);
   if (!payment) throw new Error("SafeSpend refused to decide an unknown dashboard request.");
+  if (decision === "approve" && payment.policyVersion !== undefined) {
+    const config = await loadSafeSpendServerConfig();
+    if (
+      payment.policyVersion !== config.vendorPolicyVersion ||
+      payment.policyHash !== (config.vendorPolicyHash ?? undefined)
+    ) {
+      throw new Error(
+        "SafeSpend refused because the vendor policy changed after this request was created.",
+      );
+    }
+  }
   const pending = PendingSchema.parse(await gatewayFetch<unknown>("/admin/sop/pending"));
   const exactPending = pending.pending.find(
     (run) => run.run_id === runId && run.sop_name === "approved-expense",

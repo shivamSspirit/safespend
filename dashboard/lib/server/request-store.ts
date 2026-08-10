@@ -28,6 +28,11 @@ const PaymentSchema = z
     confirmationStatus: z.enum(["processed", "confirmed", "finalized"]).optional(),
     error: z.string().max(500).optional(),
     source: z.enum(["dashboard", "telegram"]),
+    policyVersion: z.number().int().nonnegative().safe().optional(),
+    policyHash: z
+      .string()
+      .regex(/^[0-9a-f]{64}$/)
+      .optional(),
   })
   .strict();
 

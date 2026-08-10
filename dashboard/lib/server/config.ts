@@ -4,6 +4,12 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
 import type { LiveVendor } from "@/lib/safespend-types";
+import {
+  liveVendorFromBinding,
+  readActiveVendorPolicy,
+  readVendorPolicyVersion,
+  validateSignedVendorPolicy,
+} from "./vendor-policy-store";
 
 export type ProtectedVendor = Omit<LiveVendor, "allowance">;
 
@@ -101,13 +107,15 @@ export type SafeSpendServerConfig = {
   minimumSolReserveLamports: bigint;
   minimumSessionFeeReserveLamports: bigint;
   expirySafetyBufferSeconds: bigint;
+  vendorPolicyVersion: number;
+  vendorPolicyHash: string | null;
   vendors: ProtectedVendor[];
 };
 
-let cachedConfig: SafeSpendServerConfig | undefined;
+let cachedBaseConfig: SafeSpendServerConfig | undefined;
 
-export async function loadSafeSpendServerConfig(): Promise<SafeSpendServerConfig> {
-  if (cachedConfig) return cachedConfig;
+async function loadBaseSafeSpendServerConfig(): Promise<SafeSpendServerConfig> {
+  if (cachedBaseConfig) return cachedBaseConfig;
 
   const configured = process.env.SAFESPEND_PAYMENT_CONFIG;
   const exportPath = configured
@@ -140,10 +148,16 @@ export async function loadSafeSpendServerConfig(): Promise<SafeSpendServerConfig
       recurringDelegation: mapping.recurring_delegation,
       amountBaseUnits: String(vendor.amount_per_period_base_units),
       periodSeconds: vendor.period_seconds,
+      delegationNonce: mapping.delegation_nonce,
+      startAt: null,
+      expiryAt: null,
+      policyVersion: 0,
+      policyHash: null,
+      enrollmentStatus: "legacy",
     };
   });
 
-  cachedConfig = {
+  cachedBaseConfig = {
     rpcUrl: rawExport.rpc_url,
     rpcProvider: new URL(rawExport.rpc_url).hostname,
     expectedGenesisHash: rawExport.expected_genesis_hash,
@@ -160,9 +174,49 @@ export async function loadSafeSpendServerConfig(): Promise<SafeSpendServerConfig
     minimumSolReserveLamports: BigInt(policy.minimum_sol_reserve_lamports),
     minimumSessionFeeReserveLamports: BigInt(policy.minimum_session_fee_reserve_lamports),
     expirySafetyBufferSeconds: BigInt(policy.expiry_safety_buffer_seconds),
+    vendorPolicyVersion: 0,
+    vendorPolicyHash: null,
     vendors,
   };
-  return cachedConfig;
+  return cachedBaseConfig;
+}
+
+export async function loadSafeSpendServerConfig(): Promise<SafeSpendServerConfig> {
+  const base = await loadBaseSafeSpendServerConfig();
+  const active = await readActiveVendorPolicy();
+  if (!active) return base;
+  return configWithSignedPolicy(base, active);
+}
+
+function configWithSignedPolicy(
+  base: SafeSpendServerConfig,
+  value: import("@/lib/safespend-types").SignedVendorPolicyDocument,
+) {
+  const signed = validateSignedVendorPolicy(value, {
+    treasuryOwner: base.treasuryOwner,
+    subscriptionsProgram: base.subscriptionsProgram,
+    tokenProgram: base.tokenProgram,
+    canonicalMint: base.canonicalMint,
+    sessionDelegate: base.sessionDelegate,
+  });
+  return {
+    ...base,
+    vendorPolicyVersion: signed.document.version,
+    vendorPolicyHash: signed.policy_hash,
+    vendors: signed.document.vendors.map((binding) =>
+      liveVendorFromBinding(binding, signed.policy_hash),
+    ),
+  };
+}
+
+export async function loadSafeSpendServerConfigForPolicyVersion(version: number | undefined) {
+  const base = await loadBaseSafeSpendServerConfig();
+  if (version === undefined || version === 0) return base;
+  const historical = await readVendorPolicyVersion(version);
+  if (!historical) {
+    throw new Error(`Signed vendor policy v${version} is unavailable for historical verification.`);
+  }
+  return configWithSignedPolicy(base, historical);
 }
 
 export function findProtectedVendor(
@@ -172,6 +226,9 @@ export function findProtectedVendor(
 ) {
   const vendor = config.vendors.find((candidate) => candidate.id === vendorId);
   if (!vendor) throw new Error("Vendor is not present in protected configuration.");
+  if (vendor.enrollmentStatus !== "active" || vendor.policyVersion === 0) {
+    throw new Error("Vendor is not active in a founder-signed policy version.");
+  }
   if (BigInt(vendor.amountBaseUnits) !== amount) {
     throw new Error("Amount does not equal the protected per-period allowance.");
   }
