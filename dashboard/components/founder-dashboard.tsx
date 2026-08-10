@@ -337,7 +337,9 @@ export function FounderDashboard() {
               </button>
             </div>
           )}
-          {!connection ? (
+          {error && !connection ? (
+            <ErrorState error={error} onRetry={() => void refresh()} />
+          ) : !connection ? (
             <DashboardSkeleton />
           ) : !connection.gatewayOnline ? (
             <SetupState kind="offline" onDone={() => void refresh()} />
