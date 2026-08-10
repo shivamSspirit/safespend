@@ -224,6 +224,40 @@ leave a second Telegram channel runtime active:
 Before startup, validate the active config using the exact ZeroClaw revision
 you will deploy. Confirm both plugins appear in `zeroclaw plugin list`.
 
+### Activate founder-signed vendor policy service
+
+Keep `vendor_policy_url` pointed at the loopback dashboard endpoint shown in
+`zeroclaw/config.example.toml`. Start the dashboard from `dashboard/` with
+`npm ci && npm run dev`, open `http://127.0.0.1:3000`, then use **Vendors → Add
+vendor**. Connect the wallet whose public key exactly matches
+`treasury_owner`. Review the derived recipient token account, base units,
+fixed cadence seconds, one-year finite term, projected balance/runway,
+delegation PDA, policy version, and hash.
+
+The wallet requests two signatures: the canonical policy message and the
+finite delegation transaction. The dashboard submits only signed public bytes
+to the pinned Devnet RPC. Leave the dialog open until the transaction reaches
+finalized commitment and the vendor shows **Available**. On the first
+enrollment, the new signed version also imports and binds the already
+provisioned legacy demo delegations; malformed or mismatched legacy state
+blocks the migration. Until an active signed policy exists, the configured
+policy endpoint returns `503` and the payer fails closed.
+
+Active vendor rows also expose **Edit** and **Delete**. A rename signs a new immutable policy version
+without resetting the existing allowance. Changing recipient, amount, or cadence signs one atomic
+transaction that creates the replacement finite delegation and revokes the prior one; the review
+shows the replacement start. If the prior delegation has already paid in its current period, the new
+delegation starts at that period's boundary and remains unavailable until then. This prevents an
+update from resetting the counter and granting a second payment. Delete requires typing the stable
+vendor id, signs the next policy version plus the exact revoke transaction, and removes the vendor
+only after the delegation account is finalized closed. SafeSpend refuses to delete the final
+remaining vendor because the payer policy requires a non-empty vendor set.
+
+After activation, inspect the mode-`0600` immutable versions and append-only
+audit log under `dashboard/.safespend/vendor-policies/`. Never edit these
+files. Restore them from a trusted backup or repeat founder enrollment rather
+than fabricating an active pointer.
+
 ## 5. Exercise the complete flow
 
 1. Start with exactly 100 tokens. Send `/status`; it should report 10.000 weeks

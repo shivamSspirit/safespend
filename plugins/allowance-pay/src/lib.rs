@@ -38,6 +38,17 @@ mod component {
             let bytes = response.body().map_err(|_| PayError::Transport)?;
             Ok((status, bytes))
         }
+
+        fn get(&self, url: &str) -> Result<(u16, Vec<u8>), PayError> {
+            let response = waki::Client::new()
+                .get(url)
+                .connect_timeout(std::time::Duration::from_secs(5))
+                .send()
+                .map_err(|_| PayError::Transport)?;
+            let status = response.status_code();
+            let bytes = response.body().map_err(|_| PayError::Transport)?;
+            Ok((status, bytes))
+        }
     }
 
     #[derive(serde::Deserialize)]

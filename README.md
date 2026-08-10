@@ -554,10 +554,13 @@ docs/                        Setup, architecture, security, policy, and demo
 - Exact configured recurring amounts only.
 - No arbitrary transfers, partial payments, refunds, swaps, bridges, or
   trading.
-- No policy, vendor, mint, or recipient changes through chat or dashboard.
+- No policy, vendor, mint, or recipient changes through chat or ordinary payment requests.
+- Vendor additions, term updates, and deletions require the founder wallet to sign an immutable
+  policy version and the exact onchain delegation transition; publication waits for finalized
+  verification. Name-only edits retain the existing delegation.
 - No automatic retry after a failed or denied payment.
 - No invoice ingestion or accounting workflow in this release.
-- Self-hosted local dashboard; no hosted multi-tenant control plane.
+- Single-founder deployment only; no hosted multi-tenant control plane.
 - Independent security review is required before any mainnet release.
 
 These constraints are intentional. SafeSpend optimizes for a small, legible,
@@ -579,6 +582,7 @@ does not claim unpublished social evidence.
 
 ## Documentation
 
+- [Vercel + Render deployment](docs/DEPLOYMENT.md)
 - [Devnet setup](docs/SETUP.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Threat model](docs/THREAT_MODEL.md)

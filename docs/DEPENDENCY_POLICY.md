@@ -25,3 +25,20 @@ RPC wire format. The project therefore:
 
 This warning must not be described as resolved or silently excluded from audit
 output.
+
+## Dashboard audit status
+
+The founder dashboard uses `@solana/web3.js` 1.98.4 to parse and verify the
+wallet-signed legacy transaction bytes used by the deployed Subscriptions
+program. `npm audit --omit=dev` currently reports three moderate findings from
+`uuid <11.1.1` through Web3's `jayson` RPC dependency. The advisory concerns
+UUID calls supplied with a caller-owned output buffer; SafeSpend does not call
+that API or use Web3's RPC client. Its own RPC adapter uses bounded `fetch`
+responses, and proposal IDs use Node's `crypto.randomUUID`.
+
+The audit's proposed forced change downgrades Web3 to `0.0.3`, which is not a
+compatible or safe remediation. The high-severity `bigint-buffer` path formerly
+introduced by the SPL-token helper was removed: SafeSpend now derives the ATA
+from the pinned associated-token PDA seeds directly. Do not describe the
+remaining moderate transitive warning as fixed; migrate when the Solana client
+stack publishes a compatible patched release.

@@ -36,6 +36,20 @@ impl RpcTransport for HttpTransport {
         }
         Ok((status, bytes.to_vec()))
     }
+
+    fn get(&self, url: &str) -> Result<(u16, Vec<u8>), PayError> {
+        let response = self
+            .client
+            .get(url)
+            .send()
+            .map_err(|_| PayError::Transport)?;
+        let status = response.status().as_u16();
+        let bytes = response.bytes().map_err(|_| PayError::Transport)?;
+        if bytes.len() > MAX_RESPONSE_BYTES {
+            return Err(PayError::ResponseTooLarge);
+        }
+        Ok((status, bytes.to_vec()))
+    }
 }
 
 fn main() {

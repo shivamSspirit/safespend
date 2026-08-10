@@ -159,5 +159,9 @@ rpc_url = "https://api.devnet.solana.com"
 expected_genesis_hash = "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG"
 token_decimals = "6"
 session_key_base58 = "REPLACE_VIA_ZEROCLAW_CONFIG_SET"
+# The payer fetches this founder-signed immutable version before every payment
+# and verifies its Ed25519 signature against treasury_owner. Loopback failure,
+# an unsigned response, or a boundary/hash mismatch denies the payment.
+vendor_policy_url = "http://127.0.0.1:3000/api/safespend/vendor-policy/active"
 policy_json = """{"cluster":"devnet","allow_mainnet":false,"subscriptions_program":"De1egAFMkMWZSN5rYXRj9CAdheBamobVNubTsi9avR44","token_program":"TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA","canonical_mint":"REPLACE_WITH_DEVNET_USDC_MINT","treasury_owner":"REPLACE_WITH_TREASURY_OWNER","session_delegate":"REPLACE_WITH_SESSION_DELEGATE","weekly_burn_base_units":10000000,"minimum_runway_weeks":8,"minimum_token_reserve_base_units":50000000,"minimum_sol_reserve_lamports":10000000,"minimum_session_fee_reserve_lamports":1000000,"expiry_safety_buffer_seconds":300,"vendors":[{"vendor_id":"hosting","recipient_wallet":"REPLACE_WITH_HOSTING_VENDOR_WALLET","amount_per_period_base_units":12000000,"period_seconds":2592000},{"vendor_id":"contractor","recipient_wallet":"REPLACE_WITH_CONTRACTOR_WALLET","amount_per_period_base_units":12000000,"period_seconds":2592000}]}"""
 vendor_accounts_json = """[{"vendor_id":"hosting","recurring_delegation":"REPLACE_WITH_HOSTING_DELEGATION_PDA","delegation_nonce":1,"treasury_token_account":"REPLACE_WITH_TREASURY_TOKEN_ACCOUNT","recipient_token_account":"REPLACE_WITH_HOSTING_VENDOR_TOKEN_ACCOUNT"},{"vendor_id":"contractor","recurring_delegation":"REPLACE_WITH_CONTRACTOR_DELEGATION_PDA","delegation_nonce":2,"treasury_token_account":"REPLACE_WITH_TREASURY_TOKEN_ACCOUNT","recipient_token_account":"REPLACE_WITH_CONTRACTOR_TOKEN_ACCOUNT"}]"""

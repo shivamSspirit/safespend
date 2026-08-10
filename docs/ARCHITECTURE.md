@@ -91,6 +91,105 @@ Concurrent duplicate submissions are ultimately serialized by Solana account
 locking and enforced by the onchain pulled amount. SafeSpend still refuses
 automatic retries to keep operator intent unambiguous.
 
+## Founder-managed vendors and recurring cadence (specified extension)
+
+The founder dashboard shall support adding, editing, disabling, and removing a
+vendor, and shall offer recurring cadences of daily, weekly, and monthly. This
+is a policy-administration workflow, not a payment workflow: it must never
+turn a browser request, a dashboard server, Telegram, or the model into an
+unbounded transfer authority.
+
+### Vendor record
+
+Each vendor record shall contain a stable, human-readable `vendor_id`, display
+name, recipient wallet and canonical-mint recipient token account, fixed
+per-period amount in base units, cadence, start time, expiry, and lifecycle
+state. It shall also retain the derived recurring-delegation PDA, unique nonce,
+treasury token account, canonical mint, and the policy version that activated
+it. Vendor ids are unique, normalized, and immutable after activation; a
+renamed vendor retains its id. Changing a recipient, mint, amount, cadence,
+start, or expiry creates a replacement vendor policy and delegation rather
+than mutating the active one.
+
+Cadence uses fixed, chain-verifiable durations:
+
+| Display cadence | `period_seconds` |
+| --- | ---: |
+| Daily | `86_400` |
+| Weekly | `604_800` |
+| Monthly | `2_592_000` (30 days) |
+
+“Monthly” therefore means every 30 days, not a calendar-month date such as the
+last business day. The dashboard shall show the precise next eligible time and
+the fixed duration before the founder approves it.
+
+### Enrollment and change flow
+
+1. The dashboard collects vendor details and validates public keys, a positive
+   base-unit amount, an allowed cadence, finite expiry, canonical mint, and a
+   recipient token account owned by the specified recipient.
+2. It presents an immutable review screen showing recipient, mint, amount,
+   cadence/seconds, start, expiry, treasury impact, policy hash/version, and
+   the runway result assuming the first payment. The founder explicitly
+   approves this configuration with their founder-controlled signing authority.
+3. A founder-authorized setup service creates a new, finite onchain recurring
+   delegation with a fresh nonce. The session delegate may submit transfers
+   only through that delegation; it cannot create, widen, or renew one.
+4. After finalized chain verification, the service atomically publishes the
+   matching protected local policy and vendor-account mapping as a new policy
+   version. The dashboard exposes the vendor as payable only after both
+   descriptions are present and identical.
+5. The activation is written to an append-only audit record containing the
+   founder identity, prior and new policy hashes, reviewed fields,
+   delegation PDA, transaction signature, and timestamps. Sensitive keys and
+   secrets are never included.
+
+If setup, finalization, policy publication, or verification fails, the vendor
+remains inactive and unavailable for payment. A finalized onchain delegation
+without a matching active local policy is harmless and shall be displayed as
+an enrollment exception requiring founder remediation; it is not payable.
+
+Disabling a vendor immediately removes it from payment selection and creates a
+new protected policy version. Removing or materially changing one also revokes
+the old delegation with the founder authority before (or, for replacement,
+after safely activating) the new delegation. Existing requests tied to a
+superseded policy version are cancelled and require a new approval. No change
+may silently broaden an existing allowance.
+
+An empty founder-signed vendor policy is valid and means deny all vendor
+payments. This allows the founder to remove the final vendor without falling
+back to legacy static vendor configuration.
+
+### Payment behavior after activation
+
+The existing two approvals remain required for every individual payment. The
+payment request continues to carry only `vendor_id` and the exact fixed amount;
+it carries no wallet, mint, cadence, or schedule override. The payer plugin
+must bind the request to the active policy version and continue to verify all
+local/onchain terms, finalized allowance state, reserves, fees, expiry, and
+post-payment runway immediately before signing.
+
+Recurring cadence makes a vendor eligible once per period; it does not cause
+SafeSpend to submit a payment automatically. The dashboard may show due and
+next-eligible states and send reminders, but any transfer still needs the SOP
+checkpoint and the Telegram payment-tool approval. Failed, denied, or expired
+requests are never retried automatically.
+
+### Acceptance and denial requirements
+
+- A new vendor is payable only after the matching delegation and protected
+  policy version both finalize and verify.
+- The dashboard rejects an invalid recipient ATA, non-canonical mint, zero or
+  non-integer amount, unsupported cadence, non-finite expiry, duplicate id, or
+  first-payment runway breach before founder approval.
+- The payer rejects stale, disabled, superseded, or version-mismatched vendors;
+  a caller cannot race a policy update with a previously approved request.
+- The system rejects a second payment in a daily, weekly, or monthly period,
+  as well as a request before the period start or inside the expiry safety
+  buffer.
+- Chat, model output, and client-side requests cannot add vendors, alter
+  payment terms, choose a recipient, or schedule unattended payments.
+
 ## Pinned interfaces
 
 - Subscriptions program:
@@ -110,7 +209,9 @@ including `nonce.to_le_bytes()`, and tests nonce separation.
 - Classic SPL Token only; Token-2022 extensions are rejected.
 - Exact recurring amounts only; no arbitrary transfers, refunds, swaps, or
   partial discretionary spending.
-- No policy changes through chat.
+- No policy changes through chat, model output, or an ordinary payment request.
+  Founder-managed vendor changes follow the separately approved enrollment flow
+  above and require founder-controlled onchain authority.
 - No automatic retry after a failed or denied payment.
 - No invoice workflow in this first build.
 - No mainnet operation until every release gate in `SETUP.md` is complete.

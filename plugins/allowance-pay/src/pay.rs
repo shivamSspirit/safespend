@@ -1,7 +1,7 @@
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use safespend_core::{
-    evaluate_payment, ApprovedPayment, ObservedAllowance, ObservedTreasury, OperatorPolicy,
-    PaymentRequest,
+    effective_operator_policy, evaluate_payment, ApprovedPayment, ObservedAllowance,
+    ObservedTreasury, OperatorPolicy, PaymentRequest, SignedVendorPolicyDocument,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -27,6 +27,10 @@ const RECURRING_DELEGATION_V1_LEN: usize = 211;
 
 pub trait RpcTransport {
     fn post_json(&self, url: &str, body: &Value) -> Result<(u16, Vec<u8>), PayError>;
+
+    fn get(&self, _url: &str) -> Result<(u16, Vec<u8>), PayError> {
+        Err(PayError::Transport)
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
@@ -37,6 +41,12 @@ pub struct VendorAccounts {
     pub delegation_nonce: u64,
     pub treasury_token_account: String,
     pub recipient_token_account: String,
+    #[serde(default)]
+    pub start_ts: u64,
+    #[serde(default)]
+    pub expiry_ts: u64,
+    #[serde(default)]
+    pub policy_version: u64,
 }
 
 pub struct PayConfig {
@@ -45,6 +55,7 @@ pub struct PayConfig {
     pub token_decimals: u8,
     pub policy: OperatorPolicy,
     pub vendor_accounts: Vec<VendorAccounts>,
+    pub vendor_policy_url: Option<String>,
     session_key_base58: Zeroizing<String>,
 }
 
@@ -60,6 +71,7 @@ pub struct PaymentOutput {
     pub weekly_burn_base_units: u64,
     pub minimum_runway_weeks: u64,
     pub policy_hash: String,
+    pub vendor_policy_version: u64,
     pub period_start_ts: u64,
     pub period_end_ts: u64,
 }
@@ -86,6 +98,8 @@ pub enum PayError {
     SessionDelegateMismatch,
     #[error("vendor account mapping is missing or duplicated")]
     VendorMappingInvalid,
+    #[error("signed vendor policy service failed: {0}")]
+    VendorPolicy(String),
     #[error("recurring delegation PDA does not match protected seeds")]
     DelegationPdaMismatch,
     #[error("recurring delegation account is invalid")]
@@ -114,7 +128,24 @@ impl PayConfig {
         parse_address_like("expected_genesis_hash", &expected_genesis_hash)?;
         let token_decimals = parse_required(section, "token_decimals")?;
         let policy: OperatorPolicy = parse_json(section, "policy_json")?;
-        let vendor_accounts: Vec<VendorAccounts> = parse_json(section, "vendor_accounts_json")?;
+        let vendor_policy_url = section
+            .get("vendor_policy_url")
+            .filter(|value| !value.is_empty())
+            .cloned();
+        if let Some(url) = &vendor_policy_url {
+            validate_policy_url(url)?;
+        }
+        let vendor_accounts: Vec<VendorAccounts> = match section.get("vendor_accounts_json") {
+            Some(value) => serde_json::from_str(value).map_err(|_| {
+                PayError::InvalidConfig("vendor_accounts_json is invalid JSON".into())
+            })?,
+            None if vendor_policy_url.is_some() => Vec::new(),
+            None => {
+                return Err(PayError::InvalidConfig(
+                    "missing vendor_accounts_json".into(),
+                ))
+            }
+        };
         let session_key_base58 = Zeroizing::new(required(section, "session_key_base58")?);
 
         if policy.subscriptions_program != SUBSCRIPTIONS_ID.to_string() {
@@ -127,7 +158,9 @@ impl PayConfig {
                 "MVP supports only the classic SPL Token program".into(),
             ));
         }
-        if vendor_accounts.is_empty() || vendor_accounts.len() != policy.vendors.len() {
+        if vendor_policy_url.is_none()
+            && (vendor_accounts.is_empty() || vendor_accounts.len() != policy.vendors.len())
+        {
             return Err(PayError::InvalidConfig(
                 "every policy vendor needs exactly one account mapping".into(),
             ));
@@ -136,15 +169,16 @@ impl PayConfig {
             parse_address_like("recurring_delegation", &mapping.recurring_delegation)?;
             parse_address_like("treasury_token_account", &mapping.treasury_token_account)?;
             parse_address_like("recipient_token_account", &mapping.recipient_token_account)?;
-            if !policy
-                .vendors
-                .iter()
-                .any(|vendor| vendor.vendor_id == mapping.vendor_id)
-                || vendor_accounts
+            if vendor_policy_url.is_none()
+                && (!policy
+                    .vendors
                     .iter()
-                    .filter(|candidate| candidate.vendor_id == mapping.vendor_id)
-                    .count()
-                    != 1
+                    .any(|vendor| vendor.vendor_id == mapping.vendor_id)
+                    || vendor_accounts
+                        .iter()
+                        .filter(|candidate| candidate.vendor_id == mapping.vendor_id)
+                        .count()
+                        != 1)
             {
                 return Err(PayError::VendorMappingInvalid);
             }
@@ -156,9 +190,65 @@ impl PayConfig {
             token_decimals,
             policy,
             vendor_accounts,
+            vendor_policy_url,
             session_key_base58,
         })
     }
+}
+
+struct ResolvedVendorPolicy {
+    policy: OperatorPolicy,
+    vendor_accounts: Vec<VendorAccounts>,
+    version: u64,
+    policy_hash: Option<String>,
+}
+
+fn resolve_vendor_policy(
+    transport: &impl RpcTransport,
+    config: &PayConfig,
+) -> Result<ResolvedVendorPolicy, PayError> {
+    let Some(url) = &config.vendor_policy_url else {
+        return Ok(ResolvedVendorPolicy {
+            policy: config.policy.clone(),
+            vendor_accounts: config.vendor_accounts.clone(),
+            version: 0,
+            policy_hash: None,
+        });
+    };
+    let (status, bytes) = transport.get(url)?;
+    if status != 200 {
+        return Err(PayError::VendorPolicy(format!(
+            "active policy endpoint returned HTTP {status}"
+        )));
+    }
+    if bytes.len() > MAX_RPC_RESPONSE_BYTES {
+        return Err(PayError::ResponseTooLarge);
+    }
+    let signed: SignedVendorPolicyDocument = serde_json::from_slice(&bytes)
+        .map_err(|_| PayError::VendorPolicy("active policy response was invalid".into()))?;
+    let policy = effective_operator_policy(&signed, &config.policy)
+        .map_err(|error| PayError::VendorPolicy(error.to_string()))?;
+    let vendor_accounts = signed
+        .document
+        .vendors
+        .iter()
+        .map(|binding| VendorAccounts {
+            vendor_id: binding.vendor.vendor_id.clone(),
+            recurring_delegation: binding.recurring_delegation.clone(),
+            delegation_nonce: binding.delegation_nonce,
+            treasury_token_account: binding.treasury_token_account.clone(),
+            recipient_token_account: binding.recipient_token_account.clone(),
+            start_ts: binding.start_ts,
+            expiry_ts: binding.expiry_ts,
+            policy_version: binding.activated_policy_version,
+        })
+        .collect();
+    Ok(ResolvedVendorPolicy {
+        policy,
+        vendor_accounts,
+        version: signed.document.version,
+        policy_hash: Some(signed.policy_hash),
+    })
 }
 
 pub fn execute_payment(
@@ -166,19 +256,21 @@ pub fn execute_payment(
     config: &PayConfig,
     request: &PaymentRequest,
 ) -> Result<PaymentOutput, PayError> {
+    let resolved = resolve_vendor_policy(transport, config)?;
+    let policy = &resolved.policy;
+    let vendor_accounts = &resolved.vendor_accounts;
     let keypair = decode_session_key(&config.session_key_base58)?;
     let delegate = keypair.pubkey();
-    if delegate.to_string() != config.policy.session_delegate {
+    if delegate.to_string() != policy.session_delegate {
         return Err(PayError::SessionDelegateMismatch);
     }
 
-    let vendor = config
-        .policy
+    let vendor = policy
         .vendors
         .iter()
         .find(|vendor| vendor.vendor_id == request.vendor_id)
         .ok_or_else(|| PayError::PolicyDenied("UNKNOWN_VENDOR".into()))?;
-    let accounts = exact_vendor_mapping(config, &request.vendor_id)?;
+    let accounts = exact_vendor_mapping(vendor_accounts, &request.vendor_id)?;
 
     let genesis: String = rpc_result(transport, config, 1, "getGenesisHash", json!([]))?
         .as_str()
@@ -219,7 +311,7 @@ pub fn execute_payment(
         ]),
     )?;
     let (allowance_owner, allowance_data) = parse_binary_account(allowance_value)?;
-    if allowance_owner != config.policy.subscriptions_program
+    if allowance_owner != policy.subscriptions_program
         || allowance_data.len() != RECURRING_DELEGATION_V1_LEN
     {
         return Err(PayError::InvalidDelegation);
@@ -230,9 +322,9 @@ pub fn execute_payment(
         return Err(PayError::InvalidDelegation);
     }
 
-    let treasury_owner = parse_address("treasury_owner", &config.policy.treasury_owner)?;
-    let mint = parse_address("canonical_mint", &config.policy.canonical_mint)?;
-    let configured_delegate = parse_address("session_delegate", &config.policy.session_delegate)?;
+    let treasury_owner = parse_address("treasury_owner", &policy.treasury_owner)?;
+    let mint = parse_address("canonical_mint", &policy.canonical_mint)?;
+    let configured_delegate = parse_address("session_delegate", &policy.session_delegate)?;
     let expected_allowance = find_recurring_delegation_pda(
         &delegation.subscription_authority,
         &treasury_owner,
@@ -245,6 +337,19 @@ pub fn execute_payment(
     let expected_subscription_authority = SubscriptionAuthority::find_pda(&treasury_owner, &mint).0;
     if expected_subscription_authority != delegation.subscription_authority {
         return Err(PayError::SubscriptionAuthorityMismatch);
+    }
+    if accounts.policy_version > 0
+        && (accounts.policy_version > resolved.version
+            || delegation.expiry_ts < 0
+            || delegation.expiry_ts as u64 != accounts.expiry_ts
+            || delegation.current_period_start_ts < 0
+            || (delegation.current_period_start_ts as u64) < accounts.start_ts
+            || !(delegation.current_period_start_ts as u64 - accounts.start_ts)
+                .is_multiple_of(vendor.period_seconds))
+    {
+        return Err(PayError::VendorPolicy(
+            "finalized delegation does not match the active signed policy version".into(),
+        ));
     }
 
     let treasury_token_value = rpc_result(
@@ -259,9 +364,9 @@ pub fn execute_payment(
     )?;
     let treasury_token = parse_token_account(
         treasury_token_value,
-        &config.policy.token_program,
-        &config.policy.canonical_mint,
-        &config.policy.treasury_owner,
+        &policy.token_program,
+        &policy.canonical_mint,
+        &policy.treasury_owner,
         config.token_decimals,
     )?;
     let recipient_token_value = rpc_result(
@@ -276,8 +381,8 @@ pub fn execute_payment(
     )?;
     parse_token_account(
         recipient_token_value,
-        &config.policy.token_program,
-        &config.policy.canonical_mint,
+        &policy.token_program,
+        &policy.canonical_mint,
         &vendor.recipient_wallet,
         config.token_decimals,
     )?;
@@ -288,7 +393,7 @@ pub fn execute_payment(
             config,
             7,
             "getBalance",
-            json!([config.policy.treasury_owner, {"commitment": "finalized"}]),
+            json!([policy.treasury_owner, {"commitment": "finalized"}]),
         )?,
         "treasury balance",
     )?;
@@ -298,14 +403,14 @@ pub fn execute_payment(
             config,
             8,
             "getBalance",
-            json!([config.policy.session_delegate, {"commitment": "finalized"}]),
+            json!([policy.session_delegate, {"commitment": "finalized"}]),
         )?,
         "session balance",
     )?;
 
-    let observed = observed_allowance(&config.policy, &delegation, allowance_owner, now_ts)?;
+    let observed = observed_allowance(policy, &delegation, allowance_owner, now_ts)?;
     let approved = evaluate_payment(
-        &config.policy,
+        policy,
         request,
         &observed,
         &ObservedTreasury {
@@ -343,7 +448,7 @@ pub fn execute_payment(
         delegator_ata: parse_address("treasury_token_account", &accounts.treasury_token_account)?,
         receiver_ata: parse_address("recipient_token_account", &accounts.recipient_token_account)?,
         token_mint: mint,
-        token_program: parse_address("token_program", &config.policy.token_program)?,
+        token_program: parse_address("token_program", &policy.token_program)?,
         delegatee: delegate,
         event_authority: EventAuthority::find_pda().0,
         self_program: SUBSCRIPTIONS_ID,
@@ -374,7 +479,7 @@ pub fn execute_payment(
     let post_fee = session_sol
         .checked_sub(fee)
         .ok_or(PayError::FeeReserveBreach)?;
-    if post_fee < config.policy.minimum_session_fee_reserve_lamports {
+    if post_fee < policy.minimum_session_fee_reserve_lamports {
         return Err(PayError::FeeReserveBreach);
     }
 
@@ -432,11 +537,23 @@ pub fn execute_payment(
         return Err(PayError::SignatureMismatch);
     }
 
-    Ok(output_for(config, approved, submitted_signature))
+    Ok(output_for(
+        policy,
+        approved,
+        submitted_signature,
+        resolved.version,
+        resolved.policy_hash,
+    ))
 }
 
-fn output_for(config: &PayConfig, approved: ApprovedPayment, signature: String) -> PaymentOutput {
-    let cluster = match config.policy.cluster {
+fn output_for(
+    policy: &OperatorPolicy,
+    approved: ApprovedPayment,
+    signature: String,
+    vendor_policy_version: u64,
+    signed_policy_hash: Option<String>,
+) -> PaymentOutput {
+    let cluster = match policy.cluster {
         safespend_core::Cluster::Devnet => "?cluster=devnet",
         safespend_core::Cluster::Localnet => "?cluster=custom",
         safespend_core::Cluster::Mainnet => "",
@@ -449,9 +566,10 @@ fn output_for(config: &PayConfig, approved: ApprovedPayment, signature: String) 
         amount_base_units: approved.amount_base_units,
         post_payment_token_balance_base_units: approved.post_payment_token_balance_base_units,
         post_payment_runway_milliweeks: approved.post_payment_runway_milliweeks,
-        weekly_burn_base_units: config.policy.weekly_burn_base_units,
+        weekly_burn_base_units: policy.weekly_burn_base_units,
         minimum_runway_weeks: approved.minimum_runway_weeks,
-        policy_hash: approved.policy_hash,
+        policy_hash: signed_policy_hash.unwrap_or(approved.policy_hash),
+        vendor_policy_version,
         period_start_ts: approved.period_start_ts,
         period_end_ts: approved.period_end_ts,
     }
@@ -504,11 +622,10 @@ fn find_recurring_delegation_pda(
 }
 
 fn exact_vendor_mapping<'a>(
-    config: &'a PayConfig,
+    vendor_accounts: &'a [VendorAccounts],
     vendor_id: &str,
 ) -> Result<&'a VendorAccounts, PayError> {
-    let mut matches = config
-        .vendor_accounts
+    let mut matches = vendor_accounts
         .iter()
         .filter(|mapping| mapping.vendor_id == vendor_id);
     let first = matches.next().ok_or(PayError::VendorMappingInvalid)?;
@@ -668,6 +785,18 @@ fn validate_rpc_url(url: &str) -> Result<(), PayError> {
     if !url.starts_with("https://") && !loopback {
         return Err(PayError::InvalidConfig(
             "rpc_url must use HTTPS except for loopback development".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_policy_url(url: &str) -> Result<(), PayError> {
+    let loopback = url.starts_with("http://127.0.0.1:")
+        || url.starts_with("http://localhost:")
+        || url.starts_with("http://[::1]:");
+    if !url.starts_with("https://") && !loopback {
+        return Err(PayError::InvalidConfig(
+            "vendor_policy_url must use HTTPS except for the loopback dashboard service".into(),
         ));
     }
     Ok(())

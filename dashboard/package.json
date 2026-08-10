@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start -H 127.0.0.1",
     "typecheck": "tsc --noEmit",
-    "test:policy": "node --import tsx --test lib/server/vendor-policy-canonical.test.ts lib/server/vendor-enrollment-transaction.test.ts lib/treasury-math.test.ts",
+    "test:policy": "node --import tsx --test lib/server/security.test.ts lib/server/vendor-policy-canonical.test.ts lib/server/vendor-enrollment-transaction.test.ts lib/treasury-math.test.ts",
     "format": "prettier --write \"{app,components,lib}/**/*.{ts,tsx,css}\" \"*.{md,json,ts}\"",
     "format:check": "prettier --check \"{app,components,lib}/**/*.{ts,tsx,css}\" \"*.{md,json,ts}\""
   },

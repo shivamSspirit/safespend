@@ -30,6 +30,7 @@ keypairs/
 # Local development host checkouts and generated fixtures.
 .dev/
 tmp/
+deploy/render/.secrets/
 
 .state/
 dashboard/.safespend/
@@ -37,7 +38,6 @@ dashboard/.safespend/
 *.db-shm
 *.db-wal
 *.jsonl
-
 
 
 

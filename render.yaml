@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: safespend-runtime
+    runtime: docker
+    plan: starter
+    region: singapore
+    dockerfilePath: ./deploy/render/Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    autoDeployTrigger: commit
+    envVars:
+      - key: PORT
+        value: 3000
+      - key: NODE_ENV
+        value: production
+      - key: SAFESPEND_DASHBOARD_STATE_DIR
+        value: /app/storage/dashboard
+      - key: SAFESPEND_PAYMENT_CONFIG
+        value: /etc/secrets/devnet-payment-config.json
+      - key: SAFESPEND_FRONTEND_PROXY_TOKEN
+        sync: false
+      - key: ZEROCLAW_CONFIG_DIR
+        value: /app/storage/zeroclaw
+      - key: ZEROCLAW_GATEWAY_URL
+        value: http://127.0.0.1:42617
+    disk:
+      name: safespend-state
+      mountPath: /app/storage
+      sizeGB: 1
