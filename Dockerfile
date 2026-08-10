@@ -91,4 +91,4 @@ ENV HOSTNAME=0.0.0.0 \
     ZEROCLAW_GATEWAY_URL=http://127.0.0.1:42617
 
 EXPOSE 3000
-ENTRYPOINT ["node", "/app/deploy/render/start.mjs"]
+CMD ["/usr/local/bin/node", "/app/deploy/render/start.mjs"]
