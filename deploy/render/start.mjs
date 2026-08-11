@@ -158,7 +158,16 @@ try {
 
   zeroClaw = spawn(
     "/usr/local/bin/zeroclaw",
-    ["--config-dir", configDirectory, "daemon"],
+    [
+      "--config-dir",
+      configDirectory,
+      "daemon",
+      "--host",
+      "127.0.0.1",
+      "--port",
+      "42617",
+      "--verbose",
+    ],
     {
       cwd: "/app",
       env: process.env,
