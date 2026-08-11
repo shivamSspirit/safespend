@@ -117,7 +117,7 @@ async function provisionRuntime() {
 }
 
 async function waitForZeroClaw(child) {
-  for (let attempt = 0; attempt < 60; attempt += 1) {
+  for (let attempt = 0; attempt < 240; attempt += 1) {
     if (child.exitCode !== null)
       throw new Error("ZeroClaw exited during startup.");
     try {
@@ -130,7 +130,7 @@ async function waitForZeroClaw(child) {
     }
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
-  throw new Error("ZeroClaw did not become healthy within 30 seconds.");
+  throw new Error("ZeroClaw did not become healthy within 120 seconds.");
 }
 
 let zeroClaw;
