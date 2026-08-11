@@ -28,7 +28,7 @@ RUN git init \
     && test "$(git rev-parse HEAD)" = "${ZEROCLAW_REF}"
 RUN --mount=type=cache,id=zeroclaw-cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,id=zeroclaw-cargo-git,target=/usr/local/cargo/git,sharing=locked \
-    --mount=type=cache,id=zeroclaw-target,target=/source/target,sharing=locked \
+    --mount=type=cache,id=zeroclaw-target-bookworm,target=/source/target,sharing=locked \
     cargo build --release --locked --no-default-features \
       --features agent-runtime,channel-telegram,plugins-wasm-cranelift \
     && cp target/release/zeroclaw /tmp/zeroclaw \
