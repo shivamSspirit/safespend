@@ -112,7 +112,12 @@ async function provisionRuntime() {
     "gateway-token",
     path.join(dashboardDirectory, "gateway-token"),
   );
-  await requiredFile("devnet-payment-config.json");
+  const paymentConfig = path.join(
+    dashboardDirectory,
+    "devnet-payment-config.json",
+  );
+  await installSecret("devnet-payment-config.json", paymentConfig);
+  process.env.SAFESPEND_PAYMENT_CONFIG = paymentConfig;
   await seedVendorPolicies();
 }
 
