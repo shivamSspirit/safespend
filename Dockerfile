@@ -2,7 +2,6 @@
 
 ARG NODE_IMAGE=node:24-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d
 ARG RUST_IMAGE=rust:1.96-slim@sha256:31ee7fc65186be7e0e0ccb3f2ca305f14e4739e7642a1ae65753aa5d7b874523
-ARG DEBIAN_IMAGE=debian:trixie-slim@sha256:020c0d20b9880058cbe785a9db107156c3c75c2ac944a6aa7ab59f2add76a7bd
 
 FROM ${NODE_IMAGE} AS dashboard-deps
 WORKDIR /workspace/dashboard
@@ -35,9 +34,7 @@ RUN --mount=type=cache,id=zeroclaw-cargo-registry,target=/usr/local/cargo/regist
     && cp target/release/zeroclaw /tmp/zeroclaw \
     && strip /tmp/zeroclaw
 
-FROM ${NODE_IMAGE} AS node-runtime
-
-FROM ${DEBIAN_IMAGE} AS runtime
+FROM ${NODE_IMAGE} AS runtime
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates libstdc++6 \
     && rm -rf /var/lib/apt/lists/* \
@@ -45,7 +42,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && useradd --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin safespend
 
 WORKDIR /app
-COPY --from=node-runtime /usr/local/ /usr/local/
 COPY --from=zeroclaw-builder /tmp/zeroclaw /usr/local/bin/zeroclaw
 COPY --from=dashboard-builder /workspace/dashboard/.next/standalone/ ./
 COPY --from=dashboard-builder /workspace/dashboard/.next/static/ ./.next/static/
