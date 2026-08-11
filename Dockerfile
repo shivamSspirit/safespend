@@ -36,7 +36,7 @@ RUN --mount=type=cache,id=zeroclaw-cargo-registry,target=/usr/local/cargo/regist
 
 FROM ${NODE_IMAGE} AS runtime
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      ca-certificates libstdc++6 \
+      ca-certificates libstdc++6 sqlite3 \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --gid 10001 safespend \
     && useradd --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin safespend
