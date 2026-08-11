@@ -30,12 +30,28 @@ case "$key_path" in
     ;;
 esac
 
-for command in git install openssl sort tr xargs; do
+for command in git install od openssl sort tr xargs; do
   command -v "$command" >/dev/null || {
     echo "required command is unavailable: $command" >&2
     exit 2
   }
 done
+
+publisher_key="$(
+  openssl pkey -inform DER -in "$key_path" -pubout -outform DER |
+    tail -c 32 |
+    od -An -tx1 |
+    tr -d ' \n'
+)"
+trusted_publisher_key="$(tr -d '[:space:]' <"$project_root/release/trusted-publisher-key.txt")"
+if [[ ! "$publisher_key" =~ ^[0-9a-f]{64}$ ]]; then
+  echo "could not derive a 32-byte Ed25519 publisher key" >&2
+  exit 1
+fi
+if [[ "$publisher_key" != "$trusted_publisher_key" ]]; then
+  echo "publisher key does not match release/trusted-publisher-key.txt" >&2
+  exit 1
+fi
 
 temporary_dir="$(mktemp -d)"
 trap 'find "$temporary_dir" -type f -delete; rmdir "$temporary_dir"' EXIT

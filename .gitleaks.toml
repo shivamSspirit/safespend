@@ -9,4 +9,5 @@ description = "Public devnet and plugin-verification identifiers"
 regexes = [
   '''\b8ri1mCQk79fJBRwhHunHAXJZjp54BzeGtaZGQGaWtyXE\b''',
   '''\be209e856d71c4f125cee91420cb9eb6d684065c3cbf07fc50bdc6ad6cd270ce9\b''',
+  '''\bb5a8701a55553541f5c32789e96b55d67c84f56ddaee3867e0a762dc46a05771\b''',
 ]

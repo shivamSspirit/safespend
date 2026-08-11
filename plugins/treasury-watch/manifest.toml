@@ -5,5 +5,5 @@ author = "SafeSpend contributors"
 wasm_path = "safespend_treasury_watch.wasm"
 capabilities = ["tool"]
 permissions = ["config_read", "http_client"]
-publisher_key = "e209e856d71c4f125cee91420cb9eb6d684065c3cbf07fc50bdc6ad6cd270ce9"
-signature = "1sdafsDFgpRYQtKAHamgayraojmQLTd7LwWKbd8OpLDeVgsi3yxgl_W4Ts20NIZHKg2JD6sNEZ1R0HBXr4_iCw"
+publisher_key = "b5a8701a55553541f5c32789e96b55d67c84f56ddaee3867e0a762dc46a05771"
+signature = "quSYphTSGfNlv-uBtBEdKsEFzbYGB_tpGX0gPs9xwD0IEwXvtm3LyfL1Pn74wI3URbAu8Py6twnFGgG98FE1Cg"

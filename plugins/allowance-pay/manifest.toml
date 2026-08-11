@@ -5,5 +5,5 @@ author = "SafeSpend contributors"
 wasm_path = "safespend_allowance_pay.wasm"
 capabilities = ["tool"]
 permissions = ["config_read", "http_client"]
-publisher_key = "e209e856d71c4f125cee91420cb9eb6d684065c3cbf07fc50bdc6ad6cd270ce9"
-signature = "fDcBYfU2wim7PdfLFEdTd8ZJsfnuQLvgwiqXcuoGM0yzwWfGJ9CrEc9JAa6IaXun4gJHJfQDLrWu83u8a4EdBg"
+publisher_key = "b5a8701a55553541f5c32789e96b55d67c84f56ddaee3867e0a762dc46a05771"
+signature = "XSp3Fhkm0hWVM1WYGa95qIrOCu1LFLaJ-u-kaiTPn7MUMPVSlLFZWMrmshQJF5DBoNYNRoGcqCoHXVW9iRlqBg"

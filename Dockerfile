@@ -35,31 +35,6 @@ RUN --mount=type=cache,id=zeroclaw-cargo-registry,target=/usr/local/cargo/regist
     && cp target/release/zeroclaw /tmp/zeroclaw \
     && strip /tmp/zeroclaw
 
-FROM ${RUST_IMAGE} AS safespend-plugin-builder
-WORKDIR /source
-RUN rustup toolchain install 1.93.1 --profile minimal --target wasm32-wasip2
-COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
-COPY crates/ ./crates/
-COPY plugins/ ./plugins/
-COPY wit/ ./wit/
-COPY tools/ ./tools/
-RUN --mount=type=cache,id=safespend-cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
-    --mount=type=cache,id=safespend-cargo-git,target=/usr/local/cargo/git,sharing=locked \
-    --mount=type=cache,id=safespend-wasm-target,target=/source/target,sharing=locked \
-    cargo +1.93.1 build --release --locked --target wasm32-wasip2 \
-      -p safespend-treasury-watch \
-      -p safespend-allowance-pay \
-    && mkdir -p /tmp/plugins/safespend-treasury-watch \
-      /tmp/plugins/safespend-allowance-pay \
-    && cp plugins/treasury-watch/manifest.toml \
-      /tmp/plugins/safespend-treasury-watch/manifest.toml \
-    && cp target/wasm32-wasip2/release/safespend_treasury_watch.wasm \
-      /tmp/plugins/safespend-treasury-watch/safespend_treasury_watch.wasm \
-    && cp plugins/allowance-pay/manifest.toml \
-      /tmp/plugins/safespend-allowance-pay/manifest.toml \
-    && cp target/wasm32-wasip2/release/safespend_allowance_pay.wasm \
-      /tmp/plugins/safespend-allowance-pay/safespend_allowance_pay.wasm
-
 FROM ${NODE_IMAGE} AS node-runtime
 
 FROM ${DEBIAN_IMAGE} AS runtime
@@ -74,7 +49,10 @@ COPY --from=node-runtime /usr/local/ /usr/local/
 COPY --from=zeroclaw-builder /tmp/zeroclaw /usr/local/bin/zeroclaw
 COPY --from=dashboard-builder /workspace/dashboard/.next/standalone/ ./
 COPY --from=dashboard-builder /workspace/dashboard/.next/static/ ./.next/static/
-COPY --from=safespend-plugin-builder /tmp/plugins/ ./release/plugins/
+# Deploy only the reviewed, publisher-signed plugin artifacts. Rebuilding here
+# would pair a source-derived WASM binary with release manifests signed for a
+# different binary.
+COPY release/plugins/ ./release/plugins/
 COPY zeroclaw/sops/ ./zeroclaw/sops/
 COPY deploy/render/start.mjs ./deploy/render/start.mjs
 

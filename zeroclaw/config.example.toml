@@ -123,7 +123,7 @@ max_plugins = 4
 
 [plugins.security]
 signature_mode = "strict"
-trusted_publisher_keys = ["e209e856d71c4f125cee91420cb9eb6d684065c3cbf07fc50bdc6ad6cd270ce9"]
+trusted_publisher_keys = ["b5a8701a55553541f5c32789e96b55d67c84f56ddaee3867e0a762dc46a05771"]
 
 [plugins.limits]
 call_fuel = 1000000000
