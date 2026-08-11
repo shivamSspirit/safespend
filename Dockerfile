@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
 ARG NODE_IMAGE=node:24-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d
-ARG RUST_IMAGE=rust:1.96-slim@sha256:31ee7fc65186be7e0e0ccb3f2ca305f14e4739e7642a1ae65753aa5d7b874523
+ARG RUST_IMAGE=rust:1.96-slim-bookworm@sha256:e18a79fc84dfcfc3ab5ba72290398a644c135c97eaa881447fddc354ee4701a3
 
 FROM ${NODE_IMAGE} AS dashboard-deps
 WORKDIR /workspace/dashboard
@@ -43,6 +43,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 COPY --from=zeroclaw-builder /tmp/zeroclaw /usr/local/bin/zeroclaw
+RUN /usr/local/bin/zeroclaw --version
 COPY --from=dashboard-builder /workspace/dashboard/.next/standalone/ ./
 COPY --from=dashboard-builder /workspace/dashboard/.next/static/ ./.next/static/
 # Deploy only the reviewed, publisher-signed plugin artifacts. Rebuilding here
