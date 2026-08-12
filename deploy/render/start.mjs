@@ -121,7 +121,7 @@ async function provisionRuntime() {
   await seedVendorPolicies();
 }
 
-async function waitForZeroClaw(child) {
+async function waitForZeroClaw(child, gatewayToken) {
   for (let attempt = 0; attempt < 240; attempt += 1) {
     if (child.exitCode !== null)
       throw new Error("ZeroClaw exited during startup.");
@@ -129,7 +129,25 @@ async function waitForZeroClaw(child) {
       const response = await fetch("http://127.0.0.1:42617/health", {
         signal: AbortSignal.timeout(1_000),
       });
-      if (response.ok) return;
+      if (response.ok) {
+        const status = await fetch(
+          "http://127.0.0.1:42617/api/status?agent=guardian",
+          {
+            headers: { Authorization: `Bearer ${gatewayToken}` },
+            signal: AbortSignal.timeout(1_000),
+          },
+        );
+        if (status.ok) {
+          const body = await status.json();
+          if (
+            body?.paired === true &&
+            body?.agent_alias === "guardian" &&
+            body?.channels?.["telegram.guardian"] === true
+          ) {
+            return;
+          }
+        }
+      }
     } catch {
       // Retry while the daemon initializes plugins and Telegram.
     }
@@ -180,7 +198,13 @@ try {
     },
   );
   zeroClaw.once("exit", (code) => stop(code ?? 1));
-  await waitForZeroClaw(zeroClaw);
+  const gatewayToken = (
+    await readFile(path.join(dashboardDirectory, "gateway-token"), "utf8")
+  ).trim();
+  if (gatewayToken.length < 20) {
+    throw new Error("ZeroClaw gateway token is invalid.");
+  }
+  await waitForZeroClaw(zeroClaw, gatewayToken);
 
   dashboard = spawn("/usr/local/bin/node", ["/app/server.js"], {
     cwd: "/app",

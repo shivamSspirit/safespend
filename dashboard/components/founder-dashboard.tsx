@@ -207,19 +207,25 @@ export function FounderDashboard() {
   }, [refresh]);
 
   useEffect(() => {
-    if (!connection?.paired) return;
     const active = Boolean(
       data?.pendingRuns.length ||
       data?.payments.some((payment) => !["finalized", "denied", "failed"].includes(payment.status)),
     );
+    const recovering = !connection?.gatewayOnline || !connection?.paired;
     const timer = window.setInterval(
       () => {
         if (document.visibilityState === "visible") void refresh(true);
       },
-      active ? 5_000 : 15_000,
+      recovering || active ? 5_000 : 15_000,
     );
     return () => window.clearInterval(timer);
-  }, [connection?.paired, data?.payments, data?.pendingRuns.length, refresh]);
+  }, [
+    connection?.gatewayOnline,
+    connection?.paired,
+    data?.payments,
+    data?.pendingRuns.length,
+    refresh,
+  ]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = dark ? "dark" : "light";

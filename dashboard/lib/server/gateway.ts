@@ -3,6 +3,7 @@ import "server-only";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
+import { retryOnce } from "./retry";
 
 const PairResponseSchema = z.object({
   paired: z.literal(true),
@@ -66,19 +67,21 @@ export class GatewayError extends Error {
 
 export async function gatewayHealth() {
   try {
-    const response = await fetch(`${gatewayBaseUrl()}/health`, {
-      cache: "no-store",
-      signal: AbortSignal.timeout(4_000),
+    return await retryOnce(async () => {
+      const response = await fetch(`${gatewayBaseUrl()}/health`, {
+        cache: "no-store",
+        signal: AbortSignal.timeout(4_000),
+      });
+      if (!response.ok) throw new GatewayError("ZeroClaw health check failed.", response.status);
+      return z
+        .object({
+          status: z.literal("ok"),
+          paired: z.boolean(),
+          require_pairing: z.boolean(),
+        })
+        .passthrough()
+        .parse(await responseJson(response));
     });
-    if (!response.ok) throw new GatewayError("ZeroClaw health check failed.", response.status);
-    return z
-      .object({
-        status: z.literal("ok"),
-        paired: z.boolean(),
-        require_pairing: z.boolean(),
-      })
-      .passthrough()
-      .parse(await responseJson(response));
   } catch (error) {
     if (error instanceof GatewayError) throw error;
     throw new GatewayError(
