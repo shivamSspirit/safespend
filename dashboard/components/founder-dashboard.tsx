@@ -252,7 +252,7 @@ export function FounderDashboard() {
       {(!browserOnline || connection?.gatewayOnline === false) && (
         <div className="offline-banner" role="status">
           <WifiOff size={15} />
-          {!browserOnline ? "Browser offline" : "ZeroClaw gateway offline — start the daemon"}
+          {!browserOnline ? "Browser offline" : "Hosted ZeroClaw runtime is waking up"}
         </div>
       )}
       <aside className={`sidebar ${sidebarOpen ? "is-open" : ""}`} aria-label="Primary navigation">
@@ -297,7 +297,7 @@ export function FounderDashboard() {
         <div className="sidebar-boundary">
           <span>Runtime boundary</span>
           <strong>T2 · Devnet only</strong>
-          <small>Bounded signer in the local daemon</small>
+          <small>Bounded signer isolated in the hosted runtime</small>
         </div>
       </aside>
       {sidebarOpen && (
@@ -439,12 +439,12 @@ function SetupState({ kind, onDone }: { kind: "offline" | "pair"; onDone: () => 
   return (
     <div className="page-stack">
       <PageHeader
-        eyebrow="Local runtime"
-        title={kind === "offline" ? "Start ZeroClaw first" : "Pair this dashboard"}
+        eyebrow="Protected runtime"
+        title={kind === "offline" ? "ZeroClaw is waking up" : "Pair this dashboard"}
         description={
           kind === "offline"
-            ? "The dashboard reads and submits only through your loopback ZeroClaw gateway."
-            : "Use the six-digit HTTP pairing code printed by the daemon. This is not a Telegram bind code."
+            ? "The dashboard reads and submits through the loopback-only gateway inside the hosted Render runtime."
+            : "Use the six-digit HTTP pairing code printed by ZeroClaw. This is not a Telegram bind code."
         }
       />
       <section className="panel setup-panel">
@@ -454,8 +454,10 @@ function SetupState({ kind, onDone }: { kind: "offline" | "pair"; onDone: () => 
         {kind === "offline" ? (
           <>
             <h2>Gateway not reachable</h2>
-            <p>From the repository root, run:</p>
-            <code className="command-block">./scripts/run-zeroclaw-dev.sh</code>
+            <p>
+              Render may be starting the protected gateway and Telegram channel. This page retries
+              automatically; free instances can take about a minute to wake.
+            </p>
             <button className="button primary" onClick={onDone}>
               <RefreshCw size={16} /> Check again
             </button>
@@ -2306,7 +2308,7 @@ function SettingsView({
           <div className="protected-warning">
             <LockKeyhole size={17} />
             <div>
-              <strong>Local daemon holds bounded T2 authority</strong>
+              <strong>Hosted ZeroClaw runtime holds bounded T2 authority</strong>
               <span>
                 The browser receives public addresses and balances only. The limited session key
                 never leaves protected plugin configuration.
@@ -2321,7 +2323,7 @@ function SettingsView({
             </div>
             <div>
               <h2>Runtime connection</h2>
-              <p>Live local and Devnet endpoints.</p>
+              <p>Live hosted-runtime and Devnet endpoints.</p>
             </div>
           </div>
           <dl className="connection-list">
