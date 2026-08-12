@@ -32,6 +32,13 @@ async function founderAuthenticated(request: NextRequest, user: string, password
 }
 
 export async function proxy(request: NextRequest) {
+  // Rewrites re-enter Proxy with the rewritten pathname. The hosted route has
+  // its own constant-time internal-token check, while the original founder
+  // Basic header is intentionally not forwarded beyond the first pass.
+  if (request.nextUrl.pathname.startsWith("/api/safespend-hosted/")) {
+    return NextResponse.next();
+  }
+
   const backendOrigin = process.env.SAFESPEND_BACKEND_ORIGIN?.trim();
   if (!backendOrigin) return NextResponse.next();
 
