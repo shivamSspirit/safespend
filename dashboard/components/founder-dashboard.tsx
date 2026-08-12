@@ -124,8 +124,27 @@ async function jsonRequest<T>(url: string, init?: RequestInit): Promise<T> {
     headers.set("x-safespend-action", "founder-dashboard");
   }
   const response = await fetch(url, { ...init, headers, cache: "no-store" });
-  const body = (await response.json()) as T | ApiErrorBody;
-  if (!response.ok) throw new Error((body as ApiErrorBody).error || "SafeSpend request failed.");
+  const responseText = await response.text();
+  let body: T | ApiErrorBody | null = null;
+  try {
+    body = responseText ? (JSON.parse(responseText) as T | ApiErrorBody) : null;
+  } catch {
+    // Hosting layers can return plain text or HTML before the application responds.
+  }
+  if (!response.ok) {
+    const apiMessage =
+      body && typeof body === "object" && "error" in body && typeof body.error === "string"
+        ? body.error
+        : "";
+    const hostingMessage =
+      response.status >= 500
+        ? "SafeSpend runtime is temporarily unavailable or waking up. Retry shortly."
+        : `SafeSpend request failed (HTTP ${response.status}).`;
+    throw new Error(apiMessage || hostingMessage);
+  }
+  if (!body) {
+    throw new Error("SafeSpend returned an invalid response. Retry shortly.");
+  }
   return body as T;
 }
 

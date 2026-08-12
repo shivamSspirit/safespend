@@ -56,13 +56,11 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  let target: URL;
   try {
     const origin = new URL(backendOrigin);
     if (origin.protocol !== "https:" || origin.username || origin.password) {
       return unavailable("SafeSpend backend origin must be an HTTPS origin.");
     }
-    target = new URL(`${request.nextUrl.pathname}${request.nextUrl.search}`, origin);
   } catch {
     return unavailable("SafeSpend backend origin is invalid.");
   }
@@ -72,10 +70,10 @@ export async function proxy(request: NextRequest) {
   const action = request.headers.get("x-safespend-action");
   if (contentType) headers.set("content-type", contentType);
   if (action) headers.set("x-safespend-action", action);
-  headers.set("accept", "application/json");
-  headers.set("authorization", `Bearer ${backendToken}`);
-  headers.set("x-safespend-proxy", "vercel");
+  headers.set("x-safespend-internal-token", backendToken);
 
+  const hostedPath = request.nextUrl.pathname.replace("/api/safespend/", "/api/safespend-hosted/");
+  const target = new URL(`${hostedPath}${request.nextUrl.search}`, request.url);
   return NextResponse.rewrite(target, { request: { headers } });
 }
 
