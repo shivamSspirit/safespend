@@ -20,10 +20,10 @@ append-only audit log are mode `0600`. The payer fetches and verifies the active
 version before each payment; unavailable, malformed, or incorrectly signed policy data fails closed.
 
 The browser may request a configured vendor and exact configured amount. The server validates that
-closed intent, creates an `approved-expense` SOP run, and exposes its checkpoint. Clearing that
-checkpoint does not authorize payment: ZeroClaw routes the payer tool's independent `always_ask`
-approval to `telegram.guardian`. An absent or unreachable Telegram approver and a 120-second timeout
-deny the tool call.
+closed intent and creates an `approved-expense` SOP run. The dashboard displays the checkpoint as
+read-only; Telegram is the only decision surface. Clearing that checkpoint does not authorize
+payment: ZeroClaw routes the payer tool's independent `always_ask` approval to `telegram.guardian`.
+An absent or unreachable Telegram approver and a 120-second timeout deny the tool call.
 
 ## Cross-channel flow
 
@@ -31,7 +31,7 @@ deny the tool call.
 Dashboard or Telegram request
         ↓
 approved-expense SOP checkpoint
-        ↓ founder approves in dashboard or originating channel
+        ↓ founder approves or denies in Telegram
 safespend_allowance_pay approval in Telegram
         ↓
 local payer revalidates finalized allowance + policy, builds fresh tx, simulates, signs

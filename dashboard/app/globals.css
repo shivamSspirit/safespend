@@ -1150,13 +1150,6 @@ input:hover {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.approval-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 14px;
-}
-
 .transaction-state {
   animation: enter-panel 260ms ease both;
 }
@@ -2689,12 +2682,6 @@ td > strong {
   }
   .approval-facts div:last-child {
     border-bottom: 0;
-  }
-  .approval-actions {
-    flex-direction: column-reverse;
-  }
-  .approval-actions .button {
-    width: 100%;
   }
   .verification-list {
     align-items: center;

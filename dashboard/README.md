@@ -7,7 +7,8 @@ Founders can begin from Telegram or the dashboard while sharing one SOP and onch
    wallet. The service never receives the founder key.
 2. Wait for finalized delegation verification and atomic policy publication.
 3. Create an approved-expense request for an active vendor.
-4. Approve the SOP checkpoint and the separate payment tool invocation in Telegram.
+4. Approve or deny the SOP checkpoint and the separate payment tool invocation in Telegram. The
+   dashboard displays pending state but cannot resolve approvals.
 5. Record success only after finalized confirmation.
 
 There is no demo-data fallback. If ZeroClaw, the audit store, or Devnet cannot be read, the UI shows
@@ -64,8 +65,8 @@ gateway bearer, RPC URL, session key, Telegram bot token, and model credentials 
 responses.
 
 The dashboard accepts only an active founder-signed `vendorId` and exact allowance. It creates
-`approved-expense` directly through the gateway, can clear that SOP checkpoint, and then routes the
-separate `safespend_allowance_pay` approval to `telegram.guardian`. Missing Telegram, timeout,
+`approved-expense` directly through the gateway and routes both its checkpoint decision and the
+separate `safespend_allowance_pay` decision to `telegram.guardian`. Missing Telegram, timeout,
 malformed input, wrong network, wrong mint, wrong recipient, wrong allowance, or insufficient runway
 fail closed.
 

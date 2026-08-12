@@ -108,8 +108,8 @@ floor, SafeSpend refuses to submit it.
 - monitor token and SOL balances, weekly burn, and protected runway;
 - see whether ZeroClaw, the guardian agent, Telegram, and Devnet are healthy;
 - start an exact configured vendor payment;
-- approve or deny the first SOP checkpoint;
-- continue the second approval securely in Telegram;
+- approve or deny the first SOP checkpoint securely in Telegram;
+- approve or deny the second payment-tool confirmation securely in Telegram;
 - inspect dashboard- and Telegram-originated runs in one audit timeline;
 - open verified finalized transactions in Solana Explorer;
 - review vendor allowances and protected policy without exposing secrets;
@@ -467,8 +467,8 @@ npm run dev
 Open [http://127.0.0.1:3000](http://127.0.0.1:3000). If pairing is requested,
 enter the HTTP gateway code printed by the daemon—not a Telegram `/bind` code.
 
-The dashboard can create and resolve the first SOP checkpoint. The second,
-signing-level approval still routes to Telegram and fails closed after 120
+The dashboard can create and observe the first SOP checkpoint, but only Telegram can resolve it.
+The second, signing-level decision also routes to Telegram and fails closed after 120
 seconds.
 
 ## Testing the safety boundary

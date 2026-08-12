@@ -953,25 +953,13 @@ function PaymentFlow({
         />
       )}
       {payment?.status === "checkpoint" && (
-        <ApprovalCard
-          payment={payment}
-          vendor={vendor}
-          decimals={data.treasury.tokenDecimals}
-          busy={busy}
-          onDecision={(decision) =>
-            void mutate(
-              "/api/safespend/sop/decision",
-              { runId: payment.runId, decision },
-              decision === "approve" ? "SOP checkpoint approved; check Telegram" : "Payment denied",
-            )
-          }
-        />
+        <ApprovalCard payment={payment} vendor={vendor} decimals={data.treasury.tokenDecimals} />
       )}
       {payment?.status === "awaiting_telegram" && (
         <Centered
           icon={Bell}
-          title="Approve the payment tool in Telegram"
-          description="Open Safespend in Telegram and tap Approve. If Telegram is unavailable or no decision arrives within 120 seconds, ZeroClaw denies the tool call. No transaction is built before approval."
+          title="Approve or deny in Telegram"
+          description="Open SafeSpend in Telegram and review the payment-tool confirmation. If Telegram is unavailable or no decision arrives within 120 seconds, ZeroClaw denies the tool call. No transaction is built before approval."
         />
       )}
       {payment?.status === "submitting" && (
@@ -1017,14 +1005,10 @@ function ApprovalCard({
   payment,
   vendor,
   decimals,
-  busy,
-  onDecision,
 }: {
   payment: LivePayment;
   vendor: LiveVendor;
   decimals: number;
-  busy: boolean;
-  onDecision: (d: "approve" | "deny") => void;
 }) {
   return (
     <div className="approval-card amber">
@@ -1034,12 +1018,13 @@ function ApprovalCard({
         </div>
         <div>
           <span>Checkpoint 1 of 2</span>
-          <h3>Founder SOP approval</h3>
+          <h3>Approval pending in Telegram</h3>
         </div>
       </div>
       <p>
-        Approving resumes the payer step. The separate payment-tool approval will still be sent to
-        Telegram.
+        Open SafeSpend in Telegram to approve or deny this SOP checkpoint. This dashboard is
+        read-only while approval is pending. If approved, Telegram will present the separate
+        payment-tool confirmation next.
       </p>
       <dl className="approval-facts">
         <div>
@@ -1055,19 +1040,10 @@ function ApprovalCard({
           <dd>{short(payment.runId, 12, 8)}</dd>
         </div>
         <div>
-          <dt>Next approver</dt>
+          <dt>Approval surface</dt>
           <dd>telegram.guardian</dd>
         </div>
       </dl>
-      <div className="approval-actions">
-        <button className="button secondary" disabled={busy} onClick={() => onDecision("deny")}>
-          <X size={16} /> Deny
-        </button>
-        <button className="button primary" disabled={busy} onClick={() => onDecision("approve")}>
-          {busy ? <LoaderCircle size={16} className="spin" /> : <Check size={16} />} Approve
-          checkpoint
-        </button>
-      </div>
     </div>
   );
 }
@@ -1181,8 +1157,8 @@ function PendingRuns({ data }: { data: SafeSpendBootstrap }) {
                 <strong>{short(run.runId, 10, 7)}</strong>
                 <span>
                   {known.has(run.runId)
-                    ? "Exact dashboard intent recorded"
-                    : "Telegram-originated · approve in Telegram"}
+                    ? "Dashboard intent · approve or deny in Telegram"
+                    : "Telegram-originated · approve or deny in Telegram"}
                 </span>
               </div>
             </div>
