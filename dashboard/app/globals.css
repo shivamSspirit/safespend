@@ -1830,16 +1830,20 @@ td > strong {
   position: fixed;
   z-index: 90;
   inset: 0;
+  min-height: 100dvh;
   display: grid;
   place-items: center;
   padding: 24px;
   background: rgba(8, 14, 12, 0.58);
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .enrollment-dialog {
   width: min(760px, 100%);
-  max-height: calc(100vh - 48px);
+  max-height: calc(100dvh - 48px);
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
   padding: 22px;
   border: 1px solid var(--border-strong);
   border-radius: 10px;
@@ -2761,7 +2765,7 @@ td > strong {
   }
   .enrollment-dialog {
     width: 100%;
-    max-height: 94vh;
+    max-height: 94dvh;
     padding: 18px 14px calc(18px + env(safe-area-inset-bottom));
     border-right: 0;
     border-bottom: 0;

@@ -35,6 +35,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Transaction } from "@solana/web3.js";
 import type {
   ApiErrorBody,
@@ -1481,13 +1482,25 @@ function VendorEnrollmentDialog({
     : { finalizedCount: 0, finalizedOutflow: 0n, openRequestCount: 0 };
 
   useEffect(() => {
+    const previousFocus =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     closeButton.current?.focus();
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      previousFocus?.focus();
+    };
+  }, []);
+
+  useEffect(() => {
     const escape = (event: KeyboardEvent) => {
       if (event.key === "Escape" && !busy) onClose();
       if (event.key !== "Tab") return;
       const focusable = Array.from(
         dialog.current?.querySelectorAll<HTMLElement>(
-          "button:not([disabled]), input:not([disabled]), select:not([disabled]), a[href]",
+          'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])',
         ) ?? [],
       );
       const first = focusable[0];
@@ -1638,7 +1651,7 @@ function VendorEnrollmentDialog({
 
   const review = proposal?.review;
   const projectedWeeks = review ? Number(review.projectedRunwayMilliweeks) / 1000 : 0;
-  return (
+  return createPortal(
     <div className="dialog-backdrop" role="presentation">
       <section
         ref={dialog}
@@ -1672,7 +1685,7 @@ function VendorEnrollmentDialog({
             disabled={busy}
             aria-label="Close vendor policy dialog"
           >
-            <X size={18} />
+            <X size={18} aria-hidden="true" />
           </button>
         </div>
 
@@ -2084,7 +2097,8 @@ function VendorEnrollmentDialog({
           )
         )}
       </section>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
