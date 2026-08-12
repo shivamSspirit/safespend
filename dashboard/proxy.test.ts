@@ -45,6 +45,34 @@ test("authenticates the founder before rewriting to the hosted route", () =>
     );
   }));
 
+test("preserves POST body framing without forwarding founder credentials", () =>
+  withHostingEnvironment(async () => {
+    const basic = Buffer.from(`founder:${PASSWORD}`).toString("base64");
+    const body = JSON.stringify({ displayName: "Acme" });
+    const response = await proxy(
+      new NextRequest("https://dashboard.example/api/safespend/vendors/preview", {
+        method: "POST",
+        headers: {
+          Authorization: `Basic ${basic}`,
+          "Content-Length": String(Buffer.byteLength(body)),
+          "Content-Type": "application/json",
+          Cookie: "founder-session=private",
+          "x-safespend-action": "founder-dashboard",
+        },
+        body,
+      }),
+    );
+
+    assert.equal(response.headers.get("x-middleware-request-content-length"), "22");
+    assert.equal(
+      response.headers.get("x-middleware-request-x-safespend-action"),
+      "founder-dashboard",
+    );
+    assert.equal(response.headers.get("x-middleware-request-x-safespend-internal-token"), TOKEN);
+    assert.equal(response.headers.get("x-middleware-request-authorization"), null);
+    assert.equal(response.headers.get("x-middleware-request-cookie"), null);
+  }));
+
 test("does not require founder Basic auth again after the internal rewrite", () =>
   withHostingEnvironment(async () => {
     const response = await proxy(

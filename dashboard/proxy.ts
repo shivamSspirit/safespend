@@ -72,11 +72,14 @@ export async function proxy(request: NextRequest) {
     return unavailable("SafeSpend backend origin is invalid.");
   }
 
-  const headers = new Headers();
-  const contentType = request.headers.get("content-type");
-  const action = request.headers.get("x-safespend-action");
-  if (contentType) headers.set("content-type", contentType);
-  if (action) headers.set("x-safespend-action", action);
+  // Next treats this as the complete upstream header set. Start from the
+  // incoming headers so POST framing (especially content-length) survives the
+  // internal rewrite, then remove founder credentials before the second pass.
+  const headers = new Headers(request.headers);
+  headers.delete("authorization");
+  headers.delete("cookie");
+  headers.delete("host");
+  headers.delete("x-safespend-internal-token");
   headers.set("x-safespend-internal-token", backendToken);
 
   const hostedPath = request.nextUrl.pathname.replace("/api/safespend/", "/api/safespend-hosted/");
