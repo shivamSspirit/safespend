@@ -19,6 +19,8 @@ services:
         sync: false
       - key: SUPABASE_SECRET_KEY
         sync: false
+      - key: GEMINI_API_KEY
+        sync: false
       - key: SAFESPEND_PAYMENT_CONFIG
         value: /etc/secrets/devnet-payment-config.json
       - key: SAFESPEND_FRONTEND_PROXY_TOKEN

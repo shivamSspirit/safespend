@@ -12,6 +12,10 @@ import {
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { startPaymentNotifier } from "./payment-notifier.mjs";
+import {
+  assertGeminiApiKey,
+  withGeminiFlash,
+} from "./runtime-config.mjs";
 
 const runtimeUid = 10001;
 const runtimeGid = 10001;
@@ -134,17 +138,23 @@ async function seedVendorPolicies() {
 }
 
 async function provisionRuntime() {
+  assertGeminiApiKey(process.env.GEMINI_API_KEY);
   await mkdir(configDirectory, { recursive: true, mode: 0o700 });
   await mkdir(dashboardDirectory, { recursive: true, mode: 0o700 });
   await chown(configDirectory, runtimeUid, runtimeGid);
   await chown(dashboardDirectory, runtimeUid, runtimeGid);
 
   const configSource = await requiredFile("zeroclaw-config.toml");
-  const config = withDefaultTelegramAlias(await readFile(configSource, "utf8"));
+  const config = withGeminiFlash(
+    withDefaultTelegramAlias(await readFile(configSource, "utf8")),
+  );
   if (
     config.includes("/Users/") ||
     !config.includes('sops_dir = "/app/zeroclaw/sops"') ||
     !config.includes('plugins_dir = "/app/release/plugins"') ||
+    !config.includes("[providers.models.gemini.flash]") ||
+    !config.includes('model = "gemini-3.6-flash"') ||
+    config.includes("requires_openai_auth") ||
     !config.includes("[channels.telegram.default]") ||
     !config.includes(
       'vendor_policy_url = "http://127.0.0.1:3000/api/safespend/vendor-policy/active"',

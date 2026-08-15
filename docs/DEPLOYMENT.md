@@ -50,6 +50,7 @@ Docker service in Oregon. Set these server-only environment variables:
 | -------------------------------- | -------------------------------------- |
 | `SUPABASE_URL`                   | Supabase project HTTPS URL             |
 | `SUPABASE_SECRET_KEY`            | Supabase server secret (`sb_secret_…`) |
+| `GEMINI_API_KEY`                 | Google AI Studio Gemini API key        |
 | `SAFESPEND_FRONTEND_PROXY_TOKEN` | Contents of `frontend-proxy-token.txt` |
 
 Then add these Render **secret files** using the exact filenames shown:
@@ -69,6 +70,9 @@ origin, for example `https://safespend-runtime-xxxx.onrender.com`.
 Startup fails if Supabase is missing or unreachable. It never silently falls back to Render's
 ephemeral filesystem in the hosted runtime. Local development continues to use the ignored
 `dashboard/.safespend/` directory without requiring Supabase.
+
+Startup also fails if `GEMINI_API_KEY` is missing. The guardian and payer use Gemini Flash through
+the API key, so the hosted payment path does not depend on a rotating browser-login token.
 
 The publishable key and JWKS URL are not used by this server-only store. SafeSpend also accepts the
 legacy `SUPABASE_SERVICE_ROLE_KEY`, but new deployments should use `SUPABASE_SECRET_KEY`.

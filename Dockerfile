@@ -53,6 +53,7 @@ COPY release/plugins/ ./release/plugins/
 COPY zeroclaw/sops/ ./zeroclaw/sops/
 COPY deploy/render/start.mjs ./deploy/render/start.mjs
 COPY deploy/render/payment-notifier.mjs ./deploy/render/payment-notifier.mjs
+COPY deploy/render/runtime-config.mjs ./deploy/render/runtime-config.mjs
 
 RUN mkdir -p /app/storage \
     && chown 10001:10001 /app/storage \

@@ -9,6 +9,7 @@ import {
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomBytes } from "node:crypto";
+import { withGeminiFlash } from "./runtime-config.mjs";
 
 const projectRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -28,7 +29,7 @@ const localConfig = await readFile(
   path.join(projectRoot, ".zeroclaw-dev/config.toml"),
   "utf8",
 );
-let deploymentConfig = localConfig
+let deploymentConfig = withGeminiFlash(localConfig)
   .replace(/^sops_dir\s*=.*$/m, 'sops_dir = "/app/zeroclaw/sops"')
   .replace(/^plugins_dir\s*=.*$/m, 'plugins_dir = "/app/release/plugins"')
   .replace(
@@ -48,6 +49,7 @@ if (!deploymentConfig.includes("[channels.telegram.default]")) {
 if (
   deploymentConfig.includes("/Users/") ||
   deploymentConfig === localConfig ||
+  !deploymentConfig.includes("[providers.models.gemini.flash]") ||
   !deploymentConfig.includes('plugins_dir = "/app/release/plugins"')
 ) {
   throw new Error("Could not produce a portable ZeroClaw config.");
