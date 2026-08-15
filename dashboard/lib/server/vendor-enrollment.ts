@@ -35,6 +35,12 @@ import {
   reviewedTransactionMismatch,
   SYSTEM_PROGRAM,
 } from "./vendor-enrollment-transaction";
+import {
+  createRemoteState,
+  readRemoteState,
+  usesRemoteState,
+  writeRemoteState,
+} from "./state-store";
 
 const MEMO_PROGRAM = new PublicKey("MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr");
 const MAX_RPC_RESPONSE_BYTES = 1_048_576;
@@ -102,6 +108,19 @@ function proposalPath(id: string) {
 }
 
 async function writeProposal(proposal: StoredProposal, exclusive = false) {
+  if (usesRemoteState()) {
+    const key = `vendor-proposals/${proposal.proposalId}`;
+    if (exclusive) {
+      if (!(await createRemoteState(key, proposal))) {
+        const error = new Error("Vendor proposal already exists.") as NodeJS.ErrnoException;
+        error.code = "EEXIST";
+        throw error;
+      }
+    } else {
+      await writeRemoteState(key, proposal);
+    }
+    return;
+  }
   const directory = proposalDirectory();
   await mkdir(directory, { recursive: true, mode: 0o700 });
   const body = `${JSON.stringify(proposal, null, 2)}\n`;
@@ -121,7 +140,14 @@ async function writeProposal(proposal: StoredProposal, exclusive = false) {
 async function readProposal(id: string): Promise<StoredProposal> {
   let parsed: unknown;
   try {
-    parsed = JSON.parse(await readFile(proposalPath(id), "utf8"));
+    parsed = usesRemoteState()
+      ? await readRemoteState(`vendor-proposals/${id}`)
+      : JSON.parse(await readFile(proposalPath(id), "utf8"));
+    if (parsed === null) {
+      const error = new Error("Vendor proposal not found.") as NodeJS.ErrnoException;
+      error.code = "ENOENT";
+      throw error;
+    }
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
       throw new Error("Vendor enrollment proposal was not found or has expired.");

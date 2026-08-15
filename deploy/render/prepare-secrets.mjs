@@ -28,13 +28,23 @@ const localConfig = await readFile(
   path.join(projectRoot, ".zeroclaw-dev/config.toml"),
   "utf8",
 );
-const deploymentConfig = localConfig
+let deploymentConfig = localConfig
   .replace(/^sops_dir\s*=.*$/m, 'sops_dir = "/app/zeroclaw/sops"')
   .replace(/^plugins_dir\s*=.*$/m, 'plugins_dir = "/app/release/plugins"')
   .replace(
     /^vendor_policy_url\s*=.*$/m,
     'vendor_policy_url = "http://127.0.0.1:3000/api/safespend/vendor-policy/active"',
   );
+if (!deploymentConfig.includes("[channels.telegram.default]")) {
+  const guardian = deploymentConfig.match(
+    /\[channels\.telegram\.guardian\][\s\S]*?(?=\n\[|$)/,
+  )?.[0];
+  if (!guardian) throw new Error("Telegram guardian config was not found.");
+  deploymentConfig += `\n${guardian.replace(
+    "[channels.telegram.guardian]",
+    "[channels.telegram.default]",
+  )}\n`;
+}
 if (
   deploymentConfig.includes("/Users/") ||
   deploymentConfig === localConfig ||

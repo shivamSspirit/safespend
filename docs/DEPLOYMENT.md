@@ -4,8 +4,10 @@ SafeSpend uses a split deployment:
 
 - **Vercel** serves the stateless founder dashboard and protects it with founder HTTP
   authentication.
-- **Render** runs the dashboard API and the pinned ZeroClaw daemon in one container. A paid
-  persistent disk stores signed vendor policies, payment requests, and ZeroClaw SQLite state.
+- **Render Free** runs the dashboard API and the pinned ZeroClaw daemon in one container.
+- **Supabase Free** stores signed vendor policies, short-lived vendor proposals, payment activity,
+  and Telegram notification receipts. Render's local ZeroClaw SQLite store is operational scratch
+  state only and may disappear when the free container sleeps.
 - The Vercel server authenticates to Render with a separate 256-bit bearer token. Render rejects
   direct public API calls.
 
@@ -14,6 +16,10 @@ locally. Render needs only the already-bounded Devnet session key contained in t
 configuration.
 
 ## 1. Prepare Render secrets
+
+Create a Supabase Free project and run [`deploy/render/supabase.sql`](../deploy/render/supabase.sql)
+once in its SQL editor. Keep the project URL and service-role key server-only; the browser and
+Vercel deployment never receive them.
 
 From the repository root, run:
 
@@ -35,13 +41,18 @@ The ignored `deploy/render/.secrets/` directory will contain:
 The preparation script never reads or copies a founder wallet key. Treat the directory as secret
 material and do not commit it.
 
-## 2. Create the Render Blueprint
+## 2. Create the Render service
 
-In Render, create a Blueprint from this repository. Render discovers `render.yaml` and creates the
-`safespend-runtime` Docker web service with a 1 GB persistent disk in Singapore.
+In Render, create or update the service from this repository. `render.yaml` configures the free
+Docker service in Oregon. Set these server-only environment variables:
 
-Set `SAFESPEND_FRONTEND_PROXY_TOKEN` to the exact contents of
-`frontend-proxy-token.txt`. Then add these Render **secret files** using the exact filenames shown:
+| Variable                         | Value                                  |
+| -------------------------------- | -------------------------------------- |
+| `SUPABASE_URL`                   | Supabase project HTTPS URL             |
+| `SUPABASE_SECRET_KEY`            | Supabase server secret (`sb_secret_…`) |
+| `SAFESPEND_FRONTEND_PROXY_TOKEN` | Contents of `frontend-proxy-token.txt` |
+
+Then add these Render **secret files** using the exact filenames shown:
 
 | Secret filename              | Local source                                        |
 | ---------------------------- | --------------------------------------------------- |
@@ -54,6 +65,13 @@ Set `SAFESPEND_FRONTEND_PROXY_TOKEN` to the exact contents of
 
 Deploy the service and wait for `/api/health` to return HTTP 200. Copy the final HTTPS service
 origin, for example `https://safespend-runtime-xxxx.onrender.com`.
+
+Startup fails if Supabase is missing or unreachable. It never silently falls back to Render's
+ephemeral filesystem in the hosted runtime. Local development continues to use the ignored
+`dashboard/.safespend/` directory without requiring Supabase.
+
+The publishable key and JWKS URL are not used by this server-only store. SafeSpend also accepts the
+legacy `SUPABASE_SERVICE_ROLE_KEY`, but new deployments should use `SUPABASE_SECRET_KEY`.
 
 The first Docker build compiles the pinned ZeroClaw revision and can take several minutes. Startup
 fails closed if a required secret is missing, if a local macOS path leaked into the uploaded
@@ -84,8 +102,11 @@ Run all of these before using the hosted payment flow:
    and token balances.
 3. Add a small test vendor and verify the delegation reaches `finalized` before activation.
 4. Start a small payment and verify both the SOP gate and Telegram approval are required.
+   After the second approval, verify Telegram receives the submitted transaction signature even
+   though the request originated in the Vercel dashboard.
 5. Call the Render `/api/safespend/bootstrap` URL directly and confirm it returns HTTP 403.
-6. Restart the Render service and confirm vendor policy history and activity survive on the disk.
+6. Let Render sleep or restart it, then confirm vendor policy history and activity are restored
+   from Supabase.
 
 Rotate the frontend proxy token, dashboard password, gateway pairing material, and session key if
 `deploy/render/.secrets/` is ever exposed. Never upload

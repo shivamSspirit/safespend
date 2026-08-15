@@ -4,6 +4,7 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
 import type { LivePayment, PaymentStatus } from "@/lib/safespend-types";
+import { readRemoteState, usesRemoteState, writeRemoteState } from "./state-store";
 
 const PaymentSchema = z
   .object({
@@ -55,6 +56,10 @@ function storePath() {
 let writeQueue = Promise.resolve();
 
 export async function readPayments(): Promise<LivePayment[]> {
+  if (usesRemoteState()) {
+    const stored = await readRemoteState<unknown>("payments/requests");
+    return stored === null ? [] : StoreSchema.parse(stored).payments;
+  }
   try {
     const parsed = StoreSchema.parse(JSON.parse(await readFile(storePath(), "utf8")));
     return parsed.payments;
@@ -68,10 +73,11 @@ export async function readPayments(): Promise<LivePayment[]> {
 }
 
 async function writePaymentsNow(payments: LivePayment[]) {
+  const value = StoreSchema.parse({ version: 1, payments: payments.slice(0, 100) });
+  if (await writeRemoteState("payments/requests", value)) return;
   const directory = stateDirectory();
   await mkdir(directory, { recursive: true, mode: 0o700 });
-  const body = `${JSON.stringify({ version: 1, payments: payments.slice(0, 100) }, null, 2)}\n`;
-  StoreSchema.parse(JSON.parse(body));
+  const body = `${JSON.stringify(value, null, 2)}\n`;
   const temporary = `${storePath()}.${process.pid}.tmp`;
   await writeFile(temporary, body, { encoding: "utf8", mode: 0o600 });
   await rename(temporary, storePath());
@@ -79,10 +85,12 @@ async function writePaymentsNow(payments: LivePayment[]) {
 
 export async function mutatePayments(mutator: (payments: LivePayment[]) => LivePayment[]) {
   let result: LivePayment[] = [];
-  writeQueue = writeQueue.then(async () => {
-    result = mutator(await readPayments());
-    await writePaymentsNow(result);
-  });
+  writeQueue = writeQueue
+    .catch(() => undefined)
+    .then(async () => {
+      result = mutator(await readPayments());
+      await writePaymentsNow(result);
+    });
   await writeQueue;
   return result;
 }

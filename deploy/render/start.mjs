@@ -11,6 +11,7 @@ import {
 } from "node:fs/promises";
 import path from "node:path";
 import { spawn } from "node:child_process";
+import { startPaymentNotifier } from "./payment-notifier.mjs";
 
 const runtimeUid = 10001;
 const runtimeGid = 10001;
@@ -19,6 +20,43 @@ const configDirectory =
 const dashboardDirectory =
   process.env.SAFESPEND_DASHBOARD_STATE_DIR ?? "/app/storage/dashboard";
 const secretDirectory = "/etc/secrets";
+
+async function assertDurableState() {
+  const rawUrl =
+    process.env.SAFESPEND_SUPABASE_URL?.trim() ??
+    process.env.SUPABASE_URL?.trim() ??
+    "";
+  const serviceRoleKey =
+    process.env.SAFESPEND_SUPABASE_SERVICE_ROLE_KEY?.trim() ??
+    process.env.SUPABASE_SECRET_KEY?.trim() ??
+    process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ??
+    "";
+  if (!rawUrl || serviceRoleKey.length < 32) {
+    throw new Error(
+      "Supabase durable state credentials are required on Render Free.",
+    );
+  }
+  const url = new URL(rawUrl);
+  if (url.protocol !== "https:" || url.username || url.password) {
+    throw new Error("Supabase durable state URL must be an HTTPS origin.");
+  }
+  const headers = new Headers({ apikey: serviceRoleKey });
+  if (!serviceRoleKey.startsWith("sb_secret_")) {
+    headers.set("Authorization", `Bearer ${serviceRoleKey}`);
+  }
+  const response = await fetch(
+    `${url.toString().replace(/\/$/, "")}/rest/v1/safespend_state?select=state_key&limit=1`,
+    {
+      headers,
+      signal: AbortSignal.timeout(8_000),
+    },
+  );
+  if (!response.ok) {
+    throw new Error(
+      `Supabase durable state health check returned HTTP ${response.status}.`,
+    );
+  }
+}
 
 async function requiredFile(filename) {
   const value = path.join(secretDirectory, filename);
@@ -33,6 +71,26 @@ async function installSecret(sourceName, destination, mode = 0o600) {
   await chmod(temporary, mode);
   await chown(temporary, runtimeUid, runtimeGid);
   await rename(temporary, destination);
+}
+
+async function installSecretContents(contents, destination, mode = 0o600) {
+  const temporary = `${destination}.${process.pid}.tmp`;
+  await writeFile(temporary, contents, { encoding: "utf8", mode });
+  await chmod(temporary, mode);
+  await chown(temporary, runtimeUid, runtimeGid);
+  await rename(temporary, destination);
+}
+
+function withDefaultTelegramAlias(config) {
+  if (config.includes("[channels.telegram.default]")) return config;
+  const guardian = config.match(
+    /\[channels\.telegram\.guardian\][\s\S]*?(?=\n\[|$)/,
+  )?.[0];
+  if (!guardian) throw new Error("Telegram guardian config was not found.");
+  return `${config}\n${guardian.replace(
+    "[channels.telegram.guardian]",
+    "[channels.telegram.default]",
+  )}\n`;
 }
 
 async function seedVendorPolicies() {
@@ -82,11 +140,12 @@ async function provisionRuntime() {
   await chown(dashboardDirectory, runtimeUid, runtimeGid);
 
   const configSource = await requiredFile("zeroclaw-config.toml");
-  const config = await readFile(configSource, "utf8");
+  const config = withDefaultTelegramAlias(await readFile(configSource, "utf8"));
   if (
     config.includes("/Users/") ||
     !config.includes('sops_dir = "/app/zeroclaw/sops"') ||
     !config.includes('plugins_dir = "/app/release/plugins"') ||
+    !config.includes("[channels.telegram.default]") ||
     !config.includes(
       'vendor_policy_url = "http://127.0.0.1:3000/api/safespend/vendor-policy/active"',
     )
@@ -96,10 +155,7 @@ async function provisionRuntime() {
     );
   }
 
-  await installSecret(
-    "zeroclaw-config.toml",
-    path.join(configDirectory, "config.toml"),
-  );
+  await installSecretContents(config, path.join(configDirectory, "config.toml"));
   await installSecret(
     "auth-profiles.json",
     path.join(configDirectory, "auth-profiles.json"),
@@ -174,6 +230,7 @@ function stop(exitCode) {
 }
 
 try {
+  await assertDurableState();
   await provisionRuntime();
   process.setgroups([]);
   process.setgid(runtimeGid);
@@ -206,6 +263,18 @@ try {
   }
   await waitForZeroClaw(zeroClaw, gatewayToken);
 
+  const stopNotifier = await startPaymentNotifier({
+    configPath: path.join(configDirectory, "config.toml"),
+    databasePath: path.join(configDirectory, "data/sop/runs.db"),
+    ledgerPath: path.join(
+      dashboardDirectory,
+      "telegram-payment-notifications.json",
+    ),
+    sqliteBinary: process.env.SAFESPEND_SQLITE_BIN ?? "/usr/bin/sqlite3",
+    zeroclawBinary: "/usr/local/bin/zeroclaw",
+    configDirectory,
+  });
+
   dashboard = spawn("/usr/local/bin/node", ["/app/server.js"], {
     cwd: "/app",
     env: {
@@ -216,6 +285,7 @@ try {
     stdio: "inherit",
   });
   dashboard.once("exit", (code) => stop(code ?? 1));
+  zeroClaw.once("exit", stopNotifier);
 } catch (error) {
   console.error(
     `SafeSpend runtime refused to start: ${error instanceof Error ? error.message : error}`,

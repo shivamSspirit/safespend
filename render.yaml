@@ -2,8 +2,8 @@ services:
   - type: web
     name: safespend-runtime
     runtime: docker
-    plan: starter
-    region: singapore
+    plan: free
+    region: oregon
     dockerfilePath: ./Dockerfile
     dockerContext: .
     healthCheckPath: /api/health
@@ -15,6 +15,10 @@ services:
         value: production
       - key: SAFESPEND_DASHBOARD_STATE_DIR
         value: /app/storage/dashboard
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SECRET_KEY
+        sync: false
       - key: SAFESPEND_PAYMENT_CONFIG
         value: /etc/secrets/devnet-payment-config.json
       - key: SAFESPEND_FRONTEND_PROXY_TOKEN
@@ -23,7 +27,3 @@ services:
         value: /app/storage/zeroclaw
       - key: ZEROCLAW_GATEWAY_URL
         value: http://127.0.0.1:42617
-    disk:
-      name: safespend-state
-      mountPath: /app/storage
-      sizeGB: 1

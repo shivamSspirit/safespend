@@ -16,6 +16,12 @@ import {
   vendorPolicySigningMessage,
   VENDOR_POLICY_SCHEMA,
 } from "./vendor-policy-canonical";
+import {
+  createRemoteState,
+  readRemoteState,
+  usesRemoteState,
+  writeRemoteState,
+} from "./state-store";
 
 export {
   GENESIS_POLICY_HASH,
@@ -167,6 +173,12 @@ export function validateSignedVendorPolicy(
 }
 
 export async function readActiveVendorPolicy(): Promise<SignedVendorPolicyDocument | null> {
+  if (usesRemoteState()) {
+    const remote = await readRemoteState<unknown>("vendor-policies/active");
+    if (remote !== null) {
+      return SignedVendorPolicySchema.parse(remote) as SignedVendorPolicyDocument;
+    }
+  }
   try {
     return SignedVendorPolicySchema.parse(
       JSON.parse(await readFile(activePath(), "utf8")),
@@ -184,6 +196,14 @@ export async function readVendorPolicyVersion(
   version: number,
 ): Promise<SignedVendorPolicyDocument | null> {
   if (!Number.isSafeInteger(version) || version < 1) return null;
+  if (usesRemoteState()) {
+    const remote = await readRemoteState<unknown>(
+      `vendor-policies/v${String(version).padStart(6, "0")}`,
+    );
+    if (remote !== null) {
+      return SignedVendorPolicySchema.parse(remote) as SignedVendorPolicyDocument;
+    }
+  }
   const immutablePath = path.join(stateDirectory(), `v${String(version).padStart(6, "0")}.json`);
   try {
     return SignedVendorPolicySchema.parse(
@@ -195,7 +215,9 @@ export async function readVendorPolicyVersion(
   }
 }
 
-export async function publishVendorPolicy(
+let vendorPolicyWriteQueue = Promise.resolve();
+
+async function publishVendorPolicyNow(
   signed: SignedVendorPolicyDocument,
   audit: {
     action: "add" | "update" | "delete";
@@ -206,7 +228,6 @@ export async function publishVendorPolicy(
   },
 ) {
   const directory = stateDirectory();
-  await mkdir(directory, { recursive: true, mode: 0o700 });
   const body = `${JSON.stringify(signed, null, 2)}\n`;
   const current = await readActiveVendorPolicy();
   const expectedVersion = current ? current.document.version + 1 : 1;
@@ -221,6 +242,41 @@ export async function publishVendorPolicy(
     directory,
     `v${String(signed.document.version).padStart(6, "0")}.json`,
   );
+  const remoteKey = `vendor-policies/v${String(signed.document.version).padStart(6, "0")}`;
+  const remoteCreated = await createRemoteState(remoteKey, signed);
+  if (remoteCreated !== null) {
+    if (!remoteCreated) {
+      const existing = await readRemoteState<unknown>(remoteKey);
+      if (JSON.stringify(existing) !== JSON.stringify(signed)) {
+        throw new Error("A different immutable policy already occupies this version.");
+      }
+    }
+    const auditKey = "vendor-policies/audit";
+    const auditRows = (await readRemoteState<unknown[]>(auditKey)) ?? [];
+    const auditRow = {
+      schema: "safespend-vendor-policy-audit-v1",
+      version: signed.document.version,
+      previousPolicyHash: signed.document.previous_policy_hash,
+      policyHash: signed.policy_hash,
+      policySignatureBase64: signed.signature_base64,
+      ...audit,
+    };
+    await writeRemoteState(auditKey, [
+      ...auditRows
+        .filter(
+          (row) =>
+            !row ||
+            typeof row !== "object" ||
+            (row as { policyHash?: string }).policyHash !== signed.policy_hash,
+        )
+        .slice(-999),
+      auditRow,
+    ]);
+    await writeRemoteState("vendor-policies/active", signed);
+    return;
+  }
+
+  await mkdir(directory, { recursive: true, mode: 0o700 });
   try {
     await writeFile(immutablePath, body, { encoding: "utf8", mode: 0o600, flag: "wx" });
   } catch (error) {
@@ -245,6 +301,22 @@ export async function publishVendorPolicy(
   const temporary = `${activePath()}.${process.pid}.tmp`;
   await writeFile(temporary, body, { encoding: "utf8", mode: 0o600 });
   await rename(temporary, activePath());
+}
+
+export async function publishVendorPolicy(
+  signed: SignedVendorPolicyDocument,
+  audit: {
+    action: "add" | "update" | "delete";
+    delegationSignature: string;
+    founderWallet: string;
+    vendorId: string;
+    finalizedAt: string;
+  },
+) {
+  vendorPolicyWriteQueue = vendorPolicyWriteQueue
+    .catch(() => undefined)
+    .then(() => publishVendorPolicyNow(signed, audit));
+  await vendorPolicyWriteQueue;
 }
 
 export function liveVendorFromBinding(
